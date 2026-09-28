@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import httpx
-import pytest
 
-from custom_components.hikvision_access.coordinator import HikvisionAccessCoordinator
 from custom_components.hikvision_access.const import EVENT_TYPE_ACCESS
+from custom_components.hikvision_access.coordinator import HikvisionAccessCoordinator
 from custom_components.hikvision_access.isapi import HikvisionAccessClient
 
 from .conftest import DEVICE_INFO, make_handler

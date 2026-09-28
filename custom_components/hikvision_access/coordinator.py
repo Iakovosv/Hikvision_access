@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import datetime as dt
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -16,15 +17,16 @@ from .const import (
     ACS_EVENT_INITIAL_LOOKBACK_SECONDS,
     ACS_EVENT_MAJOR,
     ACS_EVENT_MINOR_SUCCESS,
-    ACS_EVENT_PAGE_SIZE,
     DOMAIN,
+    EVENT_DEDUP_WINDOW_SECONDS,
     EVENT_TYPE_ACCESS,
+    POLL_INTERVAL_SECONDS,
 )
 from .isapi import HikvisionAccessAuthError, HikvisionAccessClient, HikvisionAccessError
 
 _LOGGER = logging.getLogger(__name__)
 
-POLL_INTERVAL = dt.timedelta(seconds=30)
+POLL_INTERVAL = dt.timedelta(seconds=POLL_INTERVAL_SECONDS)
 
 
 @dataclass
@@ -43,19 +45,29 @@ class AccessEvent:
 
     @property
     def unique_id(self) -> str:
-        """Stable id used for deduplication."""
+        """Stable id used for deduplication.
 
-        return f"{self.serial_no}_{self.time.isoformat()}_{self.employee_no}_{self.minor}"
+        The device reports seconds but may repeat an event with a slightly shifted
+        timestamp, so events are bucketed into a fixed window instead of comparing
+        the exact instant.
+        """
+
+        bucket = int(self.time.timestamp()) // EVENT_DEDUP_WINDOW_SECONDS
+        return f"{self.serial_no}_{bucket}_{self.employee_no}_{self.card_no}_{self.minor}"
 
 
 def _parse_time(value: str | None) -> dt.datetime:
-    """Parse an ISAPI timestamp, falling back to now when absent."""
+    """Parse an ISAPI timestamp, falling back to now when absent.
+
+    A timestamp without an offset is the device's own local clock, which is assumed
+    to match this Home Assistant instance.
+    """
 
     if not value:
         return dt_util.utcnow()
     parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+        parsed = parsed.replace(tzinfo=dt_util.get_default_time_zone())
     return dt_util.as_utc(parsed)
 
 
@@ -92,19 +104,13 @@ class HikvisionAccessCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         start = self._last_poll or (now - dt.timedelta(seconds=ACS_EVENT_INITIAL_LOOKBACK_SECONDS))
 
         try:
-            body = await self.client.get_access_events(start, now, max_results=ACS_EVENT_PAGE_SIZE)
+            events = await self.client.get_all_access_events(start, now)
         except HikvisionAccessAuthError as ex:
-            raise UpdateFailed(str(ex)) from ex
+            raise ConfigEntryAuthFailed(str(ex)) from ex
         except HikvisionAccessError as ex:
             raise UpdateFailed(str(ex)) from ex
 
         self._last_poll = now
-
-        info = body.get("AcsEvent", {})
-        events = info.get("InfoList") or []
-        if isinstance(events, dict):
-            # A single match is returned as an object, not a list.
-            events = [events]
 
         for raw in events:
             event = self._build_event(raw)

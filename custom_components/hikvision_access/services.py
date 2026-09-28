@@ -6,7 +6,6 @@ import logging
 import secrets
 
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
@@ -27,6 +26,7 @@ from .const import (
     SERVICE_OPEN_DOOR,
 )
 from .coordinator import HikvisionAccessCoordinator
+from .isapi import HikvisionAccessError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,8 +72,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         pin = call.data.get(ATTR_PIN)
         employee_no = call.data.get(ATTR_EMPLOYEE_NO)
 
+        if end <= begin:
+            raise HomeAssistantError("end_time must be later than begin_time")
+
         if employee_no is None:
-            employee_no = _next_employee_no(coordinator)
+            employee_no = await _next_employee_no(coordinator)
         if pin is None:
             pin = f"{secrets.randbelow(10**6):06d}"
 
@@ -121,10 +124,42 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, SERVICE_OPEN_DOOR, handle_open_door, schema=OPEN_DOOR_SCHEMA)
 
 
-def _next_employee_no(coordinator: HikvisionAccessCoordinator) -> str:
-    """Allocate a high employee number for visitors so it never clashes with staff."""
+async def _next_employee_no(coordinator: HikvisionAccessCoordinator) -> str:
+    """Allocate a free employee number for a visitor.
 
-    base = 900000
-    existing = getattr(coordinator, "_visitor_seq", 0) + 1
-    coordinator._visitor_seq = existing
-    return str(base + existing)
+    Visitor numbers start at 900000 so they do not overlap staff, but any number
+    already in use on the device is skipped so an existing person is never overwritten.
+    """
+
+    existing = await _existing_employee_nos(coordinator)
+    number = 900001
+    while str(number) in existing:
+        number += 1
+    return str(number)
+
+
+async def _existing_employee_nos(coordinator: HikvisionAccessCoordinator) -> set[str]:
+    """Return the employee numbers currently enrolled on the device."""
+
+    numbers: set[str] = set()
+    position = 0
+    while True:
+        try:
+            body = await coordinator.client.get_users(position=position, max_results=100)
+        except HikvisionAccessError as ex:
+            _LOGGER.debug("Could not read the user list, using a fresh visitor number: %s", ex)
+            break
+
+        info = body.get("UserInfoSearch", {})
+        users = info.get("UserInfo") or []
+        if isinstance(users, dict):
+            users = [users]
+        for user in users:
+            if user.get("employeeNo") is not None:
+                numbers.add(str(user["employeeNo"]))
+
+        if info.get("responseStatusStrg") != "MORE" or not users:
+            break
+        position += len(users)
+
+    return numbers

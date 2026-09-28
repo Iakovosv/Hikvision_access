@@ -23,10 +23,21 @@ DEVICE_INFO = {
 }
 
 
-def make_handler(events: list[dict[str, Any]] | None = None, captured: list[httpx.Request] | None = None):
-    """Build a transport handler that mimics an access control terminal."""
+def make_handler(
+    events: list[dict[str, Any]] | None = None,
+    captured: list[httpx.Request] | None = None,
+    users: list[dict[str, Any]] | None = None,
+    page_size: int | None = None,
+    device_time: str | None = None,
+):
+    """Build a transport handler that mimics an access control terminal.
+
+    `page_size` makes the event endpoint paginate like the real device does, and
+    `users` answers the enrollment search used to pick a free employee number.
+    """
 
     events = events if events is not None else []
+    users = users if users is not None else []
 
     def handler(request: httpx.Request) -> httpx.Response:
         if captured is not None:
@@ -43,11 +54,14 @@ def make_handler(events: list[dict[str, Any]] | None = None, captured: list[http
             return httpx.Response(200, json=DEVICE_INFO)
         if path.endswith("System/capabilities"):
             return httpx.Response(200, json={"DeviceCap": {}})
+        if path.endswith("System/time"):
+            if device_time is None:
+                return httpx.Response(404, json={"statusCode": 4, "statusString": "Invalid Operation"})
+            return httpx.Response(200, json={"Time": {"localTime": device_time, "timeZone": "CST-2:00:00"}})
         if path.endswith("AccessControl/AcsEvent"):
-            return httpx.Response(
-                200,
-                json={"AcsEvent": {"searchID": "hikvision-access", "numOfMatches": len(events), "InfoList": events}},
-            )
+            return httpx.Response(200, json={"AcsEvent": _event_page(request, events, page_size)})
+        if path.endswith("AccessControl/UserInfo/Search"):
+            return httpx.Response(200, json={"UserInfoSearch": _user_page(request, users, page_size)})
         if path.endswith("AccessControl/UserInfo/Record"):
             return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
         if path.endswith("AccessControl/UserInfo/Delete"):
@@ -57,6 +71,45 @@ def make_handler(events: list[dict[str, Any]] | None = None, captured: list[http
         return httpx.Response(404, json={"statusCode": 4, "statusString": "Invalid Operation"})
 
     return handler
+
+
+def _requested_position(request: httpx.Request) -> int:
+    try:
+        body = json.loads(request.content)
+    except (ValueError, AttributeError):
+        return 0
+    for key in ("AcsEventCond", "UserInfoSearchCond"):
+        if key in body and "searchResultPosition" in body[key]:
+            return int(body[key]["searchResultPosition"])
+    return 0
+
+
+def _page(items: list[dict[str, Any]], position: int, page_size: int | None) -> tuple[list[dict[str, Any]], str]:
+    if page_size is None:
+        return items, "OK"
+    chunk = items[position : position + page_size]
+    more = position + page_size < len(items)
+    return chunk, "MORE" if more else "OK"
+
+
+def _event_page(request: httpx.Request, events: list[dict[str, Any]], page_size: int | None) -> dict[str, Any]:
+    page, status = _page(events, _requested_position(request), page_size)
+    return {
+        "searchID": "hikvision-access",
+        "numOfMatches": len(page),
+        "responseStatusStrg": status,
+        "InfoList": page,
+    }
+
+
+def _user_page(request: httpx.Request, users: list[dict[str, Any]], page_size: int | None) -> dict[str, Any]:
+    page, status = _page(users, _requested_position(request), page_size)
+    return {
+        "searchID": "hikvision-access",
+        "numOfMatches": len(page),
+        "responseStatusStrg": status,
+        "UserInfo": page,
+    }
 
 
 @pytest.fixture
