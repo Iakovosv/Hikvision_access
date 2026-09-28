@@ -26,12 +26,28 @@ class HikvisionAccessForbiddenError(HikvisionAccessError):
     """The device rejected the request, usually a permission problem."""
 
 
+class HikvisionAccessLockedError(HikvisionAccessAuthError):
+    """The device temporarily refuses authentication after repeated failures."""
+
+
+class HikvisionAccessPermissionError(HikvisionAccessForbiddenError):
+    """The credentials are valid but the account may not use this endpoint.
+
+    ISAPI answers with 401, not 403, when an authenticated account is missing a
+    permission, so a bare status code cannot be read as a credential problem.
+    """
+
+
 class HikvisionAccessClient:
     """Small async ISAPI client for Hikvision access control terminals.
 
     Only the endpoints needed for reading access events and managing persons are
     implemented. Authentication is negotiated once from the WWW-Authenticate header.
     """
+
+    #: Names of the lockout fields the device puts in a 401 body when it is refusing
+    #: further logins. Sent as XML even when the request asked for JSON.
+    LOCKOUT_MARKERS = ("lockStatus", "unlockTime")
 
     def __init__(
         self,
@@ -50,6 +66,7 @@ class HikvisionAccessClient:
         self._session = session
         self._auth: httpx.Auth | None = None
         self._auth_lock = asyncio.Lock()
+        self._auth_verified = False
 
     async def _detect_auth(self) -> None:
         """Negotiate basic or digest authentication once.
@@ -75,6 +92,62 @@ class HikvisionAccessClient:
             else:
                 raise HikvisionAccessAuthError("Device did not advertise an authentication method")
 
+    @staticmethod
+    def _is_lockout(response: httpx.Response) -> bool:
+        """Whether a 401 body says the account is locked out rather than wrong."""
+
+        try:
+            text = response.text
+        except (httpx.ResponseNotRead, httpx.StreamError):  # pragma: no cover - defensive
+            return False
+        return any(marker in text for marker in HikvisionAccessClient.LOCKOUT_MARKERS)
+
+    async def _unauthorized_error(self, url: str, response: httpx.Response) -> HikvisionAccessError:
+        """Tell a wrong password apart from a valid account without permission.
+
+        ISAPI returns 401 for both, so the status code alone would send the user into
+        an endless reauthentication loop with the correct password. The identity is
+        confirmed once against System/deviceInfo, which is the endpoint the config flow
+        already proved works; after that a lone 401 is read as a permission problem.
+        """
+
+        if self._is_lockout(response):
+            return HikvisionAccessLockedError(
+                "The device locked the account after repeated failed logins. Wait for the "
+                "lockout to expire before trying again."
+            )
+
+        if self._auth_verified or await self._verify_auth():
+            return HikvisionAccessPermissionError(
+                f"Authenticated, but the device refused {url} (401). The account is missing a "
+                "permission for this endpoint. On an access terminal, enable Remote: Log Search "
+                "and Remote: Parameters Settings for the user."
+            )
+
+        return HikvisionAccessAuthError(f"Unauthorized request {url}, check username and password")
+
+    async def _verify_auth(self) -> bool:
+        """Check once whether the negotiated credentials are accepted.
+
+        Only called after a 401, so a correct password is never re-tried in a loop and
+        a wrong one costs at most one extra attempt.
+        """
+
+        if self._auth_verified:
+            return True
+        if self._session is None:  # pragma: no cover - a client without a session cannot probe
+            return False
+        try:
+            response = await self._session.get(
+                f"{self.host}/ISAPI/System/deviceInfo", auth=self._auth, headers=None
+            )
+        except httpx.HTTPError:  # pragma: no cover - a transport failure is reported elsewhere
+            return False
+        if response.status_code == httpx.codes.OK:
+            self._auth_verified = True
+            return True
+        return False
+
     async def request(
         self,
         method: str,
@@ -94,7 +167,10 @@ class HikvisionAccessClient:
             raise HikvisionAccessError(f"Cannot reach {url}: {ex}") from ex
 
         if response.status_code == httpx.codes.UNAUTHORIZED:
-            raise HikvisionAccessAuthError(f"Unauthorized request {url}, check username and password")
+            raise await self._unauthorized_error(url, response)
+
+        self._auth_verified = True
+
         if response.status_code == httpx.codes.FORBIDDEN:
             raise HikvisionAccessForbiddenError(f"Forbidden request {url}, check user permissions")
         try:

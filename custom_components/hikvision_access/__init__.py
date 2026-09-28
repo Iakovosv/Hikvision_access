@@ -7,7 +7,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME, CONF_VERIFY_SSL, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
@@ -16,7 +16,12 @@ from homeassistant.util import dt as dt_util
 
 from .const import CLOCK_DRIFT_WARNING_SECONDS, DOMAIN
 from .coordinator import HikvisionAccessCoordinator
-from .isapi import HikvisionAccessAuthError, HikvisionAccessClient, HikvisionAccessError
+from .isapi import (
+    HikvisionAccessAuthError,
+    HikvisionAccessClient,
+    HikvisionAccessError,
+    HikvisionAccessForbiddenError,
+)
 from .services import async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -49,7 +54,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: HikvisionAccessConfigEnt
         raise ConfigEntryNotReady(f"Cannot connect to {entry.data[CONF_HOST]}: {ex}") from ex
 
     coordinator = HikvisionAccessCoordinator(hass, entry, client, device_info)
-    await coordinator.async_config_entry_first_refresh()
+    await coordinator.async_refresh()
+    if not coordinator.last_update_success:
+        error = coordinator.last_client_error or coordinator.last_exception
+        if isinstance(error, HikvisionAccessForbiddenError):
+            # Without event access the integration has nothing to do, and the credentials
+            # are not the problem. Stop retrying so the entry shows one actionable error
+            # instead of looping, and do not ask for a new password.
+            raise ConfigEntryError(str(error)) from error
+        if isinstance(error, HikvisionAccessAuthError):
+            raise ConfigEntryAuthFailed(str(error)) from error
+        raise ConfigEntryNotReady(str(error)) from error
     await _warn_on_clock_drift(client)
 
     entry.runtime_data = coordinator

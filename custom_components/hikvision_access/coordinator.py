@@ -22,7 +22,13 @@ from .const import (
     EVENT_TYPE_ACCESS,
     POLL_INTERVAL_SECONDS,
 )
-from .isapi import HikvisionAccessAuthError, HikvisionAccessClient, HikvisionAccessError
+from .isapi import (
+    HikvisionAccessAuthError,
+    HikvisionAccessClient,
+    HikvisionAccessError,
+    HikvisionAccessForbiddenError,
+    HikvisionAccessLockedError,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,6 +92,7 @@ class HikvisionAccessCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name=DOMAIN,
             update_interval=POLL_INTERVAL,
         )
@@ -96,6 +103,10 @@ class HikvisionAccessCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.last_event: AccessEvent | None = None
         self._seen: set[str] = set()
         self._last_poll: dt.datetime | None = None
+        #: The last client error before it was wrapped for the coordinator. Setup uses it
+        #: to tell a permission problem from a transport failure and choose the right
+        #: config entry error.
+        self.last_client_error: HikvisionAccessError | None = None
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch access events since the previous poll."""
@@ -105,11 +116,26 @@ class HikvisionAccessCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         try:
             events = await self.client.get_all_access_events(start, now)
+        except HikvisionAccessLockedError as ex:
+            # The account is temporarily blocked; retrying immediately would only extend
+            # the lockout, so it is reported as an update failure rather than asking for
+            # credentials that are in fact correct.
+            self.last_client_error = ex
+            raise UpdateFailed(str(ex)) from ex
         except HikvisionAccessAuthError as ex:
+            self.last_client_error = ex
             raise ConfigEntryAuthFailed(str(ex)) from ex
+        except HikvisionAccessForbiddenError as ex:
+            # 401/403 from an authenticated account is a permission problem. Asking for a
+            # new password would loop forever with the right one, so keep the entry loaded
+            # and let the user fix the account's permissions.
+            self.last_client_error = ex
+            raise UpdateFailed(str(ex)) from ex
         except HikvisionAccessError as ex:
+            self.last_client_error = ex
             raise UpdateFailed(str(ex)) from ex
 
+        self.last_client_error = None
         self._last_poll = now
 
         for raw in events:
