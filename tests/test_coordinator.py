@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import httpx
+import pytest
 
 from custom_components.hikvision_access.const import EVENT_TYPE_ACCESS
 from custom_components.hikvision_access.coordinator import HikvisionAccessCoordinator
@@ -74,3 +75,38 @@ async def test_non_access_events_are_ignored(hass) -> None:
 
     assert coordinator.last_event is None
     assert received == []
+
+
+def _coordinator_with(hass, **kwargs) -> HikvisionAccessCoordinator:
+    """Coordinator wired to a terminal with the given behaviour."""
+
+    session = httpx.AsyncClient(transport=httpx.MockTransport(make_handler(**kwargs)))
+    client = HikvisionAccessClient(HOST, "admin", "secret", session=session)
+    return HikvisionAccessCoordinator(hass, None, client, DEVICE_INFO["DeviceInfo"])
+
+
+async def test_permission_error_is_not_a_reauth(hass) -> None:
+    """A 401 from an authenticated account keeps the entry loaded.
+
+    Asking for a new password would loop forever with the correct one, so a missing
+    permission becomes an update failure instead of an authentication failure.
+    """
+
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+
+    coordinator = _coordinator_with(hass, denied_paths={"AccessControl/AcsEvent"})
+    await coordinator.client.get_device_info()
+
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+
+async def test_lockout_is_an_update_failure(hass) -> None:
+    """A locked account is retried later, it does not trigger reauthentication."""
+
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+
+    coordinator = _coordinator_with(hass, lockout_paths={"AccessControl/AcsEvent"})
+
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
