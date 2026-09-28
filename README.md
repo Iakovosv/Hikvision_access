@@ -27,6 +27,20 @@ which covers NVRs and IP cameras. Install both if you have cameras and an access
 - ISAPI access enabled on the device (enabled by default on current firmware)
 - The terminal must be reachable from Home Assistant on port 80 (or 443 with HTTPS)
 
+## Compatibility
+
+The ISAPI responses the integration relies on are modelled on this terminal:
+
+| Model | Firmware | Status |
+| --- | --- | --- |
+| DS-K1T805MBFWX | V1.9.1 build 240909 | Reference device for the `AcsEvent` and `UserInfo` queries |
+
+Access events are detected from the `major`/`minor` codes this firmware reports. A reader
+that exposes the same `AccessControl` ISAPI endpoints is expected to work, and one that
+numbers the codes differently still shows its events in the debug log, which is enough to
+add support. When reporting a different model or firmware, include the model, the firmware
+build and a debug log.
+
 ## Installation
 
 ### With HACS (custom repository)
