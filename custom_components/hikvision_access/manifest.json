@@ -1,0 +1,14 @@
+{
+  "domain": "hikvision_access",
+  "name": "Hikvision Access Control",
+  "after_dependencies": ["http"],
+  "codeowners": ["@Iakovosv"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/Iakovosv/Hikvision_access",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/Iakovosv/Hikvision_access/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

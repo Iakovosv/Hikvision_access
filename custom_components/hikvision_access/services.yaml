@@ -1,0 +1,66 @@
+create_visitor:
+  name: Create visitor
+  description: Create a visitor on the access control terminal with a validity window and a PIN.
+  fields:
+    name:
+      name: Name
+      description: Display name of the visitor.
+      required: true
+      example: "Maria Papadopoulou"
+      selector:
+        text:
+    begin_time:
+      name: Valid from
+      description: Start of the access validity window.
+      required: true
+      selector:
+        datetime:
+    end_time:
+      name: Valid until
+      description: End of the access validity window.
+      required: true
+      selector:
+        datetime:
+    pin:
+      name: PIN
+      description: Door PIN for the visitor. A random 6 digit PIN is generated when omitted.
+      selector:
+        text:
+          type: password
+    employee_no:
+      name: Employee number
+      description: Internal identifier on the terminal. Allocated automatically when omitted.
+      selector:
+        text:
+    door_no:
+      name: Door number
+      description: Door the visitor may open.
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 4
+          mode: box
+
+delete_user:
+  name: Delete user
+  description: Delete a person from the access control terminal by employee number.
+  fields:
+    employee_no:
+      name: Employee number
+      required: true
+      selector:
+        text:
+
+open_door:
+  name: Open door
+  description: Unlock a door on the access control terminal once.
+  fields:
+    door_no:
+      name: Door number
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 4
+          mode: box
