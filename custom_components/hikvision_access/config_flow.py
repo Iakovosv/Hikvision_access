@@ -2,22 +2,21 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import (
-    SOURCE_RECONFIGURE,
     SOURCE_REAUTH,
+    SOURCE_RECONFIGURE,
     ConfigFlow,
     ConfigFlowResult,
 )
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME, CONF_VERIFY_SSL
 from homeassistant.helpers.httpx_client import get_async_client
 
-from .const import CONF_VERIFY_SSL, DOMAIN
+from .const import DOMAIN
 from .isapi import HikvisionAccessAuthError, HikvisionAccessClient, HikvisionAccessError
 
 _LOGGER = logging.getLogger(__name__)
@@ -67,7 +66,7 @@ class HikvisionAccessConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except HikvisionAccessError:
                 errors["base"] = "insufficient_permission"
-            except Exception as ex:  # pylint: disable=broad-except
+            except Exception as ex:  # noqa: BLE001  # pylint: disable=broad-except
                 _LOGGER.error("Unexpected %s: %s", type(ex).__name__, ex)
                 errors["base"] = "cannot_connect"
 

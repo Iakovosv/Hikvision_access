@@ -11,7 +11,7 @@ which covers NVRs and IP cameras. Install both if you have cameras and an access
 - Discover the terminal by host, username and password, over HTTP with digest or basic auth
 - A `binary_sensor.last_access` entity that turns on when someone authenticates, with
   attributes for the name, employee number, card number, door and time
-- A `hikvision_access` event fired on the Home Assistant event bus for every granted access, so
+- A `hikvision_access_event` event fired on the Home Assistant event bus for every granted access, so
   automations can react to who entered
 - Services to manage visitors and doors:
   - `hikvision_access.create_visitor` — create a person with a validity window and a PIN
@@ -52,7 +52,7 @@ automation:
   - alias: Notify when someone enters
     triggers:
       - trigger: event
-        event_type: hikvision_access
+        event_type: hikvision_access_event
     actions:
       - action: notify.mobile_app_phone
         data:
@@ -90,6 +90,21 @@ automation:
 The official `hikvision_next` integration groups NVRs and IP cameras. An access terminal is a
 different kind of device with its own endpoints (`AccessControl/...`), its own event model and its
 own services, so keeping it separate keeps each integration focused and independently installable.
+
+## Device safety
+
+The integration is read-only unless you call a service. It never locks or unlocks a
+door on its own: it polls events and only `open_door` sends a door command.
+`create_visitor` and `delete_user` only run when you invoke them, and an automatically
+assigned visitor number is checked against the people already enrolled so an existing
+person is never overwritten.
+
+The device rate limits failed logins, so authentication is negotiated once and reused.
+If the password is wrong, the integration backs off instead of retrying in a loop.
+
+If the terminal clock drifts more than a minute from Home Assistant, a warning is logged
+at startup. The device filters events by its own clock, so a large drift means entries
+happen but no event is returned. Enable NTP on the device to keep the clocks aligned.
 
 ## Reporting issues
 

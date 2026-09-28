@@ -96,6 +96,28 @@ async def test_forbidden_raises(session: httpx.AsyncClient) -> None:
 
 
 def test_isapi_time_format() -> None:
-    """Timestamps are formatted without an offset, as the device expects."""
+    """Timestamps are converted to local time and formatted without an offset.
 
-    assert _isapi_time(dt.datetime(2026, 5, 5, 23, 59, 59, tzinfo=dt.timezone.utc)) == "2026-05-05T23:59:59"
+    The device filters events against its own clock, so a UTC timestamp is shifted
+    to the local zone before it is sent.
+    """
+
+    from homeassistant.util import dt as dt_util
+
+    moment = dt.datetime(2026, 5, 5, 23, 59, 59, tzinfo=dt.timezone.utc)
+    expected = dt_util.as_local(moment).strftime("%Y-%m-%dT%H:%M:%S")
+    assert _isapi_time(moment) == expected
+    assert _isapi_time(moment).endswith(":59")
+
+    # A naive timestamp is already local device time and is passed through unchanged.
+    assert _isapi_time(dt.datetime(2026, 5, 5, 8, 0, 0)) == "2026-05-05T08:00:00"
+
+
+def test_device_time_parsing() -> None:
+    """The device clock is parsed as local time."""
+
+    from custom_components.hikvision_access.isapi import _parse_device_time
+
+    parsed = _parse_device_time("2026-05-05T08:00:00")
+    assert parsed.tzinfo is not None
+    assert parsed.hour == 8

@@ -12,9 +12,10 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.httpx_client import get_async_client
+from homeassistant.util import dt as dt_util
 
-from .const import CONF_VERIFY_SSL, DOMAIN
-from .coordinator import AccessEvent, HikvisionAccessCoordinator
+from .const import CLOCK_DRIFT_WARNING_SECONDS, DOMAIN
+from .coordinator import HikvisionAccessCoordinator
 from .isapi import HikvisionAccessAuthError, HikvisionAccessClient, HikvisionAccessError
 from .services import async_setup_services
 
@@ -49,6 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HikvisionAccessConfigEnt
 
     coordinator = HikvisionAccessCoordinator(hass, entry, client, device_info)
     await coordinator.async_config_entry_first_refresh()
+    await _warn_on_clock_drift(client)
 
     entry.runtime_data = coordinator
 
@@ -72,6 +74,25 @@ async def async_unload_entry(hass: HomeAssistant, entry: HikvisionAccessConfigEn
     """Unload a config entry."""
 
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def _warn_on_clock_drift(client: HikvisionAccessClient) -> None:
+    """Log a warning when the device clock differs enough to hide events."""
+
+    try:
+        device_time = await client.get_device_time()
+    except HikvisionAccessError as ex:
+        _LOGGER.debug("Could not read the device clock: %s", ex)
+        return
+    if device_time is None:
+        return
+    drift = abs((dt_util.utcnow() - dt_util.as_utc(device_time)).total_seconds())
+    if drift > CLOCK_DRIFT_WARNING_SECONDS:
+        _LOGGER.warning(
+            "The access control device clock differs from Home Assistant by %.0f seconds. "
+            "Access events may be missed until the clocks match (enable NTP on the device)",
+            drift,
+        )
 
 
 class HikvisionAccessEntity(Entity):

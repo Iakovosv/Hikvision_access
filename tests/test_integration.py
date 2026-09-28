@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import httpx
-import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
