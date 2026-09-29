@@ -176,6 +176,53 @@ async def test_last_access_sensor_is_unknown_before_any_event(
     assert state.state == "unknown"
 
 
+async def test_last_person_sensor_names_who_opened_the_door(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """The last person sensor carries the name, which the binary sensor cannot."""
+
+    entry, _ = await _setup(hass, monkeypatch, [ACCESS_EVENT])
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.front_door_last_person")
+    assert state is not None
+    assert state.state == "Maria"
+    assert state.attributes["employee_no"] == "900001"
+    assert state.attributes["door_no"] == 1
+    assert state.attributes["granted"] is True
+
+
+async def test_last_person_sensor_falls_back_to_the_employee_number(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """A person the device knows only by number still shows something readable."""
+
+    event = {**ACCESS_EVENT, "name": None}
+    entry, _ = await _setup(hass, monkeypatch, [event])
+    await hass.async_block_till_done()
+
+    assert hass.states.get("sensor.front_door_last_person").state == "900001"
+
+
+async def test_last_access_time_carries_the_exact_date_and_time(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """Besides the relative state, the exact date, time and datetime are exposed."""
+
+    from homeassistant.util import dt as dt_util
+
+    entry, _ = await _setup(hass, monkeypatch, [ACCESS_EVENT])
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.front_door_last_access_time")
+    assert state is not None
+
+    local = dt_util.parse_datetime(state.state).astimezone()
+    assert state.attributes["date"] == local.strftime("%Y-%m-%d")
+    assert state.attributes["time"] == local.strftime("%H:%M:%S")
+    assert state.attributes["datetime"] == local.isoformat()
+
+
 async def test_entities_survive_without_event_permission(hass: HomeAssistant, monkeypatch) -> None:
     """Denied events leave the door buttons usable and explain the sensor."""
 

@@ -3,8 +3,6 @@
 A Home Assistant integration for Hikvision access control terminals (door stations / face
 terminals), talking to the device directly over ISAPI. No cloud.
 
-
-
 ## Everything is done from the UI
 
 Nothing here needs YAML. You set the integration up, manage people, and configure the
@@ -33,13 +31,15 @@ have to open a text editor.
 | Entity | What it is | Use it for |
 | --- | --- | --- |
 | `binary_sensor.last_access` | Turns on when someone authenticates. Attributes: `name`, `employee_no`, `card_no`, `door_no`, `method`, `granted` | A trigger that fires the moment someone enters |
-| `sensor.last_access_time` | The timestamp of the last authentication, with the same attributes plus `granted` | A dashboard card: who entered, and when |
+| `sensor.last_access_person` | The name of the person who last opened the door, so the device page and a card can read it directly. Attributes: `employee_no`, `card_no`, `door_no`, `method`, `granted`, `time` | A dashboard card: who entered |
+| `sensor.last_access_time` | The timestamp of the last authentication, with the same attributes plus `granted` and the exact `date`, `time` and `datetime` | A dashboard card: who entered, and exactly when |
 | `sensor.persons_enrolled` | How many people are on the terminal. Read from `UserInfo/Count`, with a search fallback for older firmware | A quick count, no access-event permission needed |
 | `button.open_door_N` | One button per door. The number of doors is read from the terminal, so a single-door model shows one button, not a fixed pair | Unlocking a door from a dashboard or an automation |
 | `button.refresh_people` | Re-reads the door and person details from the terminal | After granting the account its permissions, instead of restarting Home Assistant |
 
 The names follow the Home Assistant language, so a Greek interface shows `Τελευταία πρόσβαση`,
-`Ώρα τελευταίας πρόσβασης`, `Καταχωρημένα πρόσωπα`, `Άνοιγμα πόρτας` and `Ανανέωση προσώπων`.
+`Τελευταίο πρόσωπο`, `Ώρα τελευταίας πρόσβασης`, `Καταχωρημένα πρόσωπα`, `Άνοιγμα πόρτας`
+and `Ανανέωση προσώπων`.
 
 ### The Configure menu
 
@@ -222,9 +222,9 @@ If the password is wrong, the integration backs off instead of retrying in a loo
 
 ## Why a separate integration
 
-The official `hikvision_next` integration groups NVRs and IP cameras. An access terminal is a
-different kind of device with its own endpoints (`AccessControl/...`), its own event model and its
-own services, so keeping it separate keeps each integration focused and independently installable.
+An access terminal is its own kind of device: it has its own endpoints (`AccessControl/...`),
+its own event model and its own services. This integration talks to those endpoints directly,
+so it stays focused on the terminal and can be installed on its own.
 
 ## Reporting issues
 
