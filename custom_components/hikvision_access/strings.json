@@ -31,7 +31,6 @@
           "add": "Add person",
           "edit": "Edit person",
           "delete": "Delete person",
-          "cards": "Manage card",
           "open_door": "Open door"
         }
       },
@@ -60,7 +59,7 @@
       },
       "edit_form": {
         "title": "Edit person",
-        "description": "Editing {name} (ID {employee_no}).\nPerson type: {user_type} | Gender: {gender}\nValidity: {validity} | Cards: {cards} | Fingerprints: {fingerprints}\nVisit times: {visits}\n\nLeave the PIN empty to keep the current one. Fingerprints can only be enrolled on the device itself.",
+        "description": "Editing {name} (ID {employee_no}).\nPerson type: {user_type} | Gender: {gender}\nValidity: {validity} | Cards: {cards} | Fingerprints: {fingerprints}\nVisit times: {visits}\n\nLeave the PIN empty to keep the current one. Leave the card number as it is to keep the current card, or type a new one to replace it. Fingerprints can only be enrolled on the device itself.",
         "data": {
           "employee_no": "Employee ID",
           "name": "Name",
@@ -88,20 +87,6 @@
           "confirm": "Yes, delete this person"
         }
       },
-      "cards": {
-        "title": "Manage card",
-        "description": "Choose the person whose card you want to change.",
-        "data": {
-          "employee_no": "Person"
-        }
-      },
-      "card_form": {
-        "title": "Manage card",
-        "description": "Current cards: {cards}\n\nEnter a card number to add it, or leave the field empty and submit to remove every card.",
-        "data": {
-          "card_no": "Card number"
-        }
-      },
       "open_door": {
         "title": "Open door",
         "description": "Unlock a door once.",
@@ -117,14 +102,24 @@
     "abort": {
       "not_loaded": "The device is not set up. Fix the setup error on the integration page first.",
       "no_persons": "No persons are enrolled on the terminal.",
-      "person_gone": "That person no longer exists on the terminal.",
-      "delete_cancelled": "Deletion cancelled."
+      "delete_cancelled": "Deletion cancelled.",
+      "cannot_list": "The device did not return the person list. Check that the account may read Remote: Parameters Settings, then try again."
     }
   },
   "entity": {
     "binary_sensor": {
       "last_access": {
         "name": "Last access"
+      }
+    },
+    "button": {
+      "open_door": {
+        "name": "Open door {door}"
+      }
+    },
+    "sensor": {
+      "last_access": {
+        "name": "Last access time"
       }
     }
   }

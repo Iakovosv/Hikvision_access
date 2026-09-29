@@ -474,6 +474,16 @@ class HikvisionAccessClient:
             headers={"Content-Type": "application/json"},
         )
 
+    async def open_door(self, door_no: int = 1) -> dict[str, Any]:
+        """Unlock a door once."""
+
+        return await self.request(
+            "PUT",
+            f"AccessControl/RemoteControl/door/{door_no}",
+            data="<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>",
+            headers={"Content-Type": "application/xml"},
+        )
+
     def event_picture_url(self, event_id: str) -> str:
         """Return the URL of the snapshot attached to an access event."""
 
