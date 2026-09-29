@@ -20,6 +20,7 @@ from .const import (
     DOMAIN,
     EVENT_DEDUP_WINDOW_SECONDS,
     EVENT_TYPE_ACCESS,
+    POLL_INTERVAL_DEGRADED_SECONDS,
     POLL_INTERVAL_SECONDS,
 )
 from .isapi import (
@@ -33,6 +34,7 @@ from .isapi import (
 _LOGGER = logging.getLogger(__name__)
 
 POLL_INTERVAL = dt.timedelta(seconds=POLL_INTERVAL_SECONDS)
+POLL_INTERVAL_DEGRADED = dt.timedelta(seconds=POLL_INTERVAL_DEGRADED_SECONDS)
 
 
 @dataclass
@@ -107,6 +109,10 @@ class HikvisionAccessCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         #: to tell a permission problem from a transport failure and choose the right
         #: config entry error.
         self.last_client_error: HikvisionAccessError | None = None
+        #: True when the last poll was refused because the account may not read events.
+        #: Setup keeps the entry loaded in that case, and the poll slows down until the
+        #: permission is granted.
+        self.event_access_denied = False
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch access events since the previous poll."""
@@ -121,21 +127,32 @@ class HikvisionAccessCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # the lockout, so it is reported as an update failure rather than asking for
             # credentials that are in fact correct.
             self.last_client_error = ex
+            self._poll_interval_update(POLL_INTERVAL_DEGRADED)
             raise UpdateFailed(str(ex)) from ex
         except HikvisionAccessAuthError as ex:
             self.last_client_error = ex
             raise ConfigEntryAuthFailed(str(ex)) from ex
         except HikvisionAccessForbiddenError as ex:
             # 401/403 from an authenticated account is a permission problem. Asking for a
-            # new password would loop forever with the right one, so keep the entry loaded
-            # and let the user fix the account's permissions.
+            # new password would loop forever with the right one, and raising UpdateFailed
+            # would log an ERROR on every poll. Instead the poll slows down, the entities
+            # go unavailable and every other feature keeps working. The permission is
+            # checked again on the next poll, so granting it needs no restart.
             self.last_client_error = ex
-            raise UpdateFailed(str(ex)) from ex
+            if not self.event_access_denied:
+                _LOGGER.warning("Access events are disabled for %s: %s", self.serial_no, ex)
+            self.event_access_denied = True
+            self._poll_interval_update(POLL_INTERVAL_DEGRADED)
+            return self.data or {}                    # noqa: RET504 - keep the last data
         except HikvisionAccessError as ex:
             self.last_client_error = ex
             raise UpdateFailed(str(ex)) from ex
 
         self.last_client_error = None
+        if self.event_access_denied:
+            _LOGGER.info("Access events are working again for %s", self.serial_no)
+        self.event_access_denied = False
+        self._poll_interval_update(POLL_INTERVAL)
         self._last_poll = now
 
         for raw in events:
@@ -153,6 +170,12 @@ class HikvisionAccessCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._seen = set(list(self._seen)[-250:])
 
         return {"last_event": self.last_event, "count": len(events), "updated_at": now}
+
+    def _poll_interval_update(self, interval: dt.timedelta) -> None:
+        """Change the poll pace without waking the coordinator."""
+
+        if self.update_interval != interval:
+            self.update_interval = interval
 
     def _build_event(self, raw: dict[str, Any]) -> AccessEvent | None:
         """Turn one ISAPI event into an AccessEvent, ignoring non-access entries."""

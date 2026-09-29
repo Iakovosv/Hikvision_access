@@ -7,7 +7,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME, CONF_VERIFY_SSL, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryError, ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
@@ -20,7 +20,6 @@ from .isapi import (
     HikvisionAccessAuthError,
     HikvisionAccessClient,
     HikvisionAccessError,
-    HikvisionAccessForbiddenError,
 )
 from .services import async_setup_services
 
@@ -57,13 +56,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: HikvisionAccessConfigEnt
     await coordinator.async_refresh()
     if not coordinator.last_update_success:
         error = coordinator.last_client_error or coordinator.last_exception
-        if isinstance(error, HikvisionAccessForbiddenError):
-            # Without event access the integration has nothing to do, and the credentials
-            # are not the problem. Stop retrying so the entry shows one actionable error
-            # instead of looping, and do not ask for a new password.
-            raise ConfigEntryError(str(error)) from error
         if isinstance(error, HikvisionAccessAuthError):
+            # The credentials are wrong, so ask for new ones.
             raise ConfigEntryAuthFailed(str(error)) from error
+        # Anything else (transport failure, transient device error) is retried. A missing
+        # event permission does not land here: the coordinator keeps the entry loaded and
+        # only degrades the event polling, because person management, the services,
+        # diagnostics and the door control do not need access events.
         raise ConfigEntryNotReady(str(error)) from error
     await _warn_on_clock_drift(client)
 
