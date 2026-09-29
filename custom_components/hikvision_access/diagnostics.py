@@ -7,10 +7,11 @@ from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME, CONF_VERIFY_SSL
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.httpx_client import get_async_client
 
-from .isapi import HikvisionAccessError
+from .isapi import HikvisionAccessClient, HikvisionAccessError
 
 TO_REDACT = {CONF_HOST, CONF_PASSWORD, CONF_USERNAME}
 
@@ -27,10 +28,12 @@ async def async_get_config_entry_diagnostics(
 
     coordinator = getattr(entry, "runtime_data", None)
     if coordinator is None:
-        # Setup failed before a coordinator existed; the entry fields are all we can show.
+        # Setup failed before a coordinator existed, which is exactly when the probe is
+        # most useful: the entry fields alone say nothing about which call was refused.
         return {
             "entry": async_redact_data(entry.as_dict(), TO_REDACT),
-            "note": "The integration is not set up, so no endpoint probe could be run.",
+            "probe": await _probe_endpoints(hass, entry),
+            "note": "The integration is not set up, so these probes were run directly.",
         }
 
     client = coordinator.client
@@ -43,8 +46,28 @@ async def async_get_config_entry_diagnostics(
         },
         "last_update_success": coordinator.last_update_success,
         "last_exception": type(coordinator.last_exception).__name__ if coordinator.last_exception else None,
-        "probe": {},
+        "probe": await _probe_endpoints(hass, entry, client=client),
     }
+
+    return diagnostics
+
+
+async def _probe_endpoints(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    client: HikvisionAccessClient | None = None,
+) -> dict[str, str]:
+    """Report which ISAPI calls the configured account is allowed to use."""
+
+    if client is None:
+        verify_ssl = entry.data.get(CONF_VERIFY_SSL, True)
+        client = HikvisionAccessClient(
+            host=entry.data[CONF_HOST],
+            username=entry.data[CONF_USERNAME],
+            password=entry.data[CONF_PASSWORD],
+            verify_ssl=verify_ssl,
+            session=get_async_client(hass, verify_ssl),
+        )
 
     probes: tuple[tuple[str, str, str, str | None], ...] = (
         ("device_info", "GET", "System/deviceInfo", None),
@@ -68,13 +91,14 @@ async def async_get_config_entry_diagnostics(
         ),
     )
 
+    result: dict[str, str] = {}
     for name, method, path, data in probes:
         try:
             await client.request(method, path, data=data)
         except HikvisionAccessError as ex:
-            diagnostics["probe"][name] = f"{type(ex).__name__}: {ex}"
+            result[name] = f"{type(ex).__name__}: {ex}"
         else:
-            diagnostics["probe"][name] = "ok"
+            result[name] = "ok"
 
-    return diagnostics
+    return result
 
