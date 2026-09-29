@@ -43,7 +43,7 @@ async def test_menu_is_shown(hass: HomeAssistant, monkeypatch) -> None:
 
     result = await flow.async_step_init()
     assert result["type"] == "menu"
-    assert set(result["menu_options"]) == {"add", "edit", "delete", "cards", "open_door"}
+    assert set(result["menu_options"]) == {"add", "edit", "delete", "open_door"}
 
 
 async def test_add_person_sends_all_fields(hass: HomeAssistant, monkeypatch) -> None:
@@ -152,22 +152,49 @@ async def test_delete_requires_confirmation(hass: HomeAssistant, monkeypatch) ->
     assert _body(delete)["UserInfoDelCond"]["EmployeeNoList"] == [{"employeeNo": "1001"}]
 
 
-async def test_card_form_adds_and_clears(hass: HomeAssistant, monkeypatch) -> None:
-    """A card number is added, and an empty field removes the existing card."""
+async def test_edit_form_changes_the_card(hass: HomeAssistant, monkeypatch) -> None:
+    """The card field in the edit form replaces the card the person holds."""
 
     entry, captured = await _setup(hass, monkeypatch, users=[PERSON])
     flow = await _flow(hass, entry)
 
-    await flow.async_step_cards({"employee_no": "1001"})
-    await flow.async_step_card_form({"card_no": "12345678"})
+    await flow.async_step_edit({"employee_no": "1001"})
+    result = await flow.async_step_edit_form(
+        {"name": "Maria", "card_no": "12345678", "door_no": 1}
+    )
+    assert result["type"] == "create_entry"
+
     record = [r for r in captured if r.url.path.endswith("CardInfo/Record")][-1]
     assert _body(record)["CardInfo"]["cardNo"] == "12345678"
-
-    flow2 = await _flow(hass, entry)
-    await flow2.async_step_cards({"employee_no": "1001"})
-    await flow2.async_step_card_form({"card_no": ""})
+    # The old card is removed so the person does not end up with two.
     delete = [r for r in captured if r.url.path.endswith("CardInfo/Delete")][-1]
     assert _body(delete)["CardInfoDelCond"]["CardNoList"] == [{"cardNo": "55512345"}]
+
+
+async def test_edit_form_keeps_the_card_when_unchanged(hass: HomeAssistant, monkeypatch) -> None:
+    """Submitting the edit form without touching the card leaves it alone."""
+
+    entry, captured = await _setup(hass, monkeypatch, users=[PERSON])
+    flow = await _flow(hass, entry)
+
+    await flow.async_step_edit({"employee_no": "1001"})
+    result = await flow.async_step_edit_form(
+        {"name": "Maria", "card_no": "55512345", "door_no": 1}
+    )
+    assert result["type"] == "create_entry"
+    assert not [r for r in captured if r.url.path.endswith("CardInfo/Record")]
+
+
+async def test_edit_form_keeps_the_card_when_field_is_empty(hass: HomeAssistant, monkeypatch) -> None:
+    """An empty card field on edit keeps the card, it does not delete it."""
+
+    entry, captured = await _setup(hass, monkeypatch, users=[PERSON])
+    flow = await _flow(hass, entry)
+
+    await flow.async_step_edit({"employee_no": "1001"})
+    result = await flow.async_step_edit_form({"name": "Maria", "card_no": "", "door_no": 1})
+    assert result["type"] == "create_entry"
+    assert not [r for r in captured if r.url.path.endswith("CardInfo/Delete")]
 
 
 async def test_edit_with_no_persons_aborts(hass: HomeAssistant, monkeypatch) -> None:
@@ -179,6 +206,55 @@ async def test_edit_with_no_persons_aborts(hass: HomeAssistant, monkeypatch) -> 
     result = await flow.async_step_edit()
     assert result["type"] == "abort"
     assert result["reason"] == "no_persons"
+
+
+async def test_listing_without_permission_aborts_with_reason(hass: HomeAssistant, monkeypatch) -> None:
+    """A device that refuses the user list explains it instead of crashing.
+
+    The account may be missing Remote: Parameters Settings, so the 401 must turn into a
+    readable message rather than an exception out of the flow.
+    """
+
+    entry, _ = await _setup(
+        hass, monkeypatch, denied_paths={"AccessControl/UserInfo/Search"}
+    )
+    flow = await _flow(hass, entry)
+
+    for step in ("async_step_edit", "async_step_delete"):
+        result = await getattr(flow, step)()
+        assert result["type"] == "abort"
+        assert result["reason"] == "cannot_list"
+
+
+async def test_open_door_step_unlocks(hass: HomeAssistant, monkeypatch) -> None:
+    """The open door step sends the ISAPI unlock command."""
+
+    entry, captured = await _setup(hass, monkeypatch)
+    flow = await _flow(hass, entry)
+
+    result = await flow.async_step_open_door({"door_no": 2})
+    assert result["type"] == "create_entry"
+    door = [r for r in captured if "RemoteControl/door/2" in str(r.url)][-1]
+    assert b"<cmd>open</cmd>" in door.content
+
+
+async def test_edit_form_reports_invalid_validity(hass: HomeAssistant, monkeypatch) -> None:
+    """A bad validity window shows a form error instead of raising."""
+
+    entry, _ = await _setup(hass, monkeypatch, users=[PERSON])
+    flow = await _flow(hass, entry)
+
+    await flow.async_step_edit({"employee_no": "1001"})
+    result = await flow.async_step_edit_form(
+        {
+            "name": "Maria",
+            "validity_enabled": True,
+            "begin_time": "2030-01-01T00:00:00+00:00",
+            "end_time": "2020-01-01T00:00:00+00:00",
+        }
+    )
+    assert result["type"] == "form"
+    assert result["errors"] == {"base": "invalid_validity"}
 
 
 async def test_methods_on_isapi_client(hass: HomeAssistant, monkeypatch) -> None:

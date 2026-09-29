@@ -108,7 +108,7 @@ def make_handler(
             return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
         if suffix.endswith("AccessControl/CardInfo/Delete"):
             return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
-        if suffix.endswith("RemoteControl/door/1"):
+        if "RemoteControl/door/" in suffix:
             return httpx.Response(200, text="<ResponseStatus><statusCode>1</statusCode></ResponseStatus>")
         return httpx.Response(404, json={"statusCode": 4, "statusString": "Invalid Operation"})
 
