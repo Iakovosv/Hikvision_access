@@ -90,6 +90,23 @@ def test_strings_json_matches_english() -> None:
 
 
 @pytest.mark.parametrize("language", ["en", *LANGUAGES])
+def test_last_access_entities_are_translated(language: str) -> None:
+    """The last-access entities have a name, and the binary sensor a word for on and off.
+
+    The binary sensor can only read `on`/`off`, so without a state translation the UI
+    shows the raw English default ("Detected"); the name of the person has its own sensor,
+    which is why `sensor.last_access_person` must carry a name too.
+    """
+
+    entity = json.loads((TRANSLATIONS / f"{language}.json").read_text(encoding="utf-8"))["entity"]
+
+    assert entity["sensor"]["last_access_person"]["name"]
+    states = entity["binary_sensor"]["last_access"]["state"]
+    assert states["on"] and states["off"]
+    assert states["on"] != states["off"]
+
+
+@pytest.mark.parametrize("language", ["en", *LANGUAGES])
 async def test_every_key_the_flow_uses_resolves(hass: HomeAssistant, monkeypatch, language) -> None:
     """No abort reason or form error can reach the user as a raw key."""
 
