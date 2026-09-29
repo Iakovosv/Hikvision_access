@@ -91,6 +91,13 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
   edits and resubmits without touching the PIN field — treat empty PIN as "keep".
 - The reference firmware does not report visitor visit counters over ISAPI. Read them by
   name when present (`VISIT_TIMES_*_KEYS` in `const.py`); never write a guessed field name.
+  Confirmed against the device: `UserInfo/Search` on 192.168.1.163 returns per person only
+  `employeeNo, name, userType, Valid, belongGroup, localPassword, dynamicCode, doorRight,
+  RightPlan, maxOpenDoorTime, openDoorTime, roomNumber, floorNumber, gender, numOfCard,
+  numOfFP, PersonInfoExtends` — no `maxTimes`, no `visitTimes`, not even for a `visitor`
+  with an active validity window. `AccessControl/capabilities` does not advertise one either.
+  So "how many uses remain" cannot be shown on this model; the limit is write-only. Do not
+  add a remaining-uses entity on the strength of the ISAPI guide alone — check the read-back.
 - Fingerprints cannot be enrolled remotely over ISAPI. Face needs a multipart upload to
   `Intelligent/FDLib/FaceDataRecord`; the target device has no camera, so it is skipped.
 - `UserInfo Search` with `EmployeeNoList` is ignored by some firmware; `get_person` falls
