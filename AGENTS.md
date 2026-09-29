@@ -47,6 +47,11 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
 - A 401 on `AccessControl/AcsEvent` after a successful `System/deviceInfo` means the
   device account lacks `Remote: Log Search / Interrogate Working Status`. It is not a
   password problem. Also enable `Remote: Parameters Settings`.
+- The two permissions map to different features, so name both when a user is stuck:
+  `Remote: Parameters Settings` covers `/AccessControl/UserInfo/*` (the person list, the
+  person count, add/edit/delete), `Remote: Log Search` covers `/AccessControl/AcsEvent`
+  (the last-access sensor and binary sensor). A 401 on UserInfo is why "Edit person" and
+  "Delete person" abort and "Add person" is refused while everything else works.
 - A missing event permission must never fail setup. Only the last-access sensor needs
   access events; person management, the services, diagnostics and the door control do
   not. `coordinator.event_access_denied` carries the state, the poll degrades to
@@ -76,3 +81,8 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
 - Every change: bump `manifest.json` + `CHANGELOG.md`, run the suite, then PR + release.
 - Tests patch the real client through the conftest transport handler; no mocks of the
   integration's own code.
+- Every user-facing string lives in `translations/en.json`, and `strings.json` stays a copy
+  of it. When a non-English locale is added, it must cover every English key with the same
+  placeholders: Home Assistant shows the raw key (e.g. a bare `cannot_list`) when a
+  translation is missing, and silently drops a localized string whose placeholders differ
+  from the English one. `tests/test_translations.py` guards both, per language.

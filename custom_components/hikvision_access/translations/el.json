@@ -1,0 +1,132 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hikvision Access Control",
+        "description": "Σύνδεση με τερματικό ελέγχου πρόσβασης Hikvision. Δημιουργήστε έναν χρήστη στη συσκευή με δικαιώματα Remote: Parameters Settings και Remote: Log Search.",
+        "data": {
+          "host": "[%key:common::config_flow::data::host%]",
+          "username": "[%key:common::config_flow::data::username%]",
+          "password": "[%key:common::config_flow::data::password%]",
+          "verify_ssl": "[%key:common::config_flow::data::verify_ssl%]"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+      "insufficient_permission": "Η συσκευή αρνήθηκε το αίτημα. Ελέγξτε τα δικαιώματα του χρήστη."
+    },
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]",
+      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Διαχείριση προσώπων",
+        "menu_options": {
+          "add": "Προσθήκη προσώπου",
+          "edit": "Επεξεργασία προσώπου",
+          "delete": "Διαγραφή προσώπου",
+          "open_door": "Άνοιγμα πόρτας"
+        }
+      },
+      "add": {
+        "title": "Προσθήκη προσώπου",
+        "description": "Δημιουργία προσώπου στο τερματικό. Αφήστε το Employee ID κενό για αυτόματη εκχώρηση, και το PIN κενό για τυχαίο.",
+        "data": {
+          "employee_no": "Employee ID",
+          "name": "Όνομα",
+          "gender": "Φύλο",
+          "user_type": "Τύπος προσώπου",
+          "pin": "PIN",
+          "validity_enabled": "Περιορισμός ισχύος",
+          "begin_time": "Ισχύει από",
+          "end_time": "Ισχύει έως",
+          "card_no": "Αριθμός κάρτας",
+          "door_no": "Πόρτα"
+        }
+      },
+      "edit": {
+        "title": "Επεξεργασία προσώπου",
+        "description": "Επιλέξτε το πρόσωπο που θα αλλάξετε.",
+        "data": {
+          "employee_no": "Πρόσωπο"
+        }
+      },
+      "edit_form": {
+        "title": "Επεξεργασία προσώπου",
+        "description": "Επεξεργασία {name} (ID {employee_no}).\nΤύπος: {user_type} | Φύλο: {gender}\nΙσχύς: {validity} | Κάρτες: {cards} | Δακτυλικά: {fingerprints}\nΠροσκλήσεις: {visits}\n\nΑφήστε το PIN κενό για να κρατήσετε το τρέχον. Αφήστε τον αριθμό κάρτας όπως είναι για να κρατήσετε την τρέχουσα κάρτα, ή πληκτρολογήστε νέον για αντικατάσταση. Τα δακτυλικά αποτυπώματα καταχωρούνται μόνο στη συσκευή.",
+        "data": {
+          "employee_no": "Employee ID",
+          "name": "Όνομα",
+          "gender": "Φύλο",
+          "user_type": "Τύπος προσώπου",
+          "pin": "PIN",
+          "validity_enabled": "Περιορισμός ισχύος",
+          "begin_time": "Ισχύει από",
+          "end_time": "Ισχύει έως",
+          "card_no": "Αριθμός κάρτας",
+          "door_no": "Πόρτα"
+        }
+      },
+      "delete": {
+        "title": "Διαγραφή προσώπου",
+        "description": "Επιλέξτε το πρόσωπο που θα διαγράψετε.",
+        "data": {
+          "employee_no": "Πρόσωπο"
+        }
+      },
+      "delete_confirm": {
+        "title": "Διαγραφή προσώπου",
+        "description": "Διαγραφή του προσώπου {employee_no} από το τερματικό; Δεν μπορεί να αναιρεθεί.",
+        "data": {
+          "confirm": "Ναι, διαγραφή αυτού του προσώπου"
+        }
+      },
+      "open_door": {
+        "title": "Άνοιγμα πόρτας",
+        "description": "Ξεκλείδωμα μιας πόρτας μία φορά.",
+        "data": {
+          "door_no": "Πόρτα"
+        }
+      }
+    },
+    "error": {
+      "device_error": "Η συσκευή αρνήθηκε το αίτημα. Ελέγξτε τα δικαιώματα του χρήστη και το log της συσκευής.",
+      "invalid_validity": "Το 'Ισχύει έως' πρέπει να είναι μετά το 'Ισχύει από'."
+    },
+    "abort": {
+      "not_loaded": "Η συσκευή δεν έχει ρυθμιστεί. Διορθώστε πρώτα το σφάλμα στη σελίδα της ενσωμάτωσης.",
+      "no_persons": "Δεν υπάρχουν πρόσωπα στο τερματικό.",
+      "delete_cancelled": "Η διαγραφή ακυρώθηκε.",
+      "cannot_list": "Η συσκευή δεν επέστρεψε τη λίστα προσώπων, οπότε δεν μπορεί να αλλαχθεί.\n\nΑπάντηση από τη συσκευή: {error}\n\nΑυτό συνήθως σημαίνει έλλειψη δικαιώματος. Στο τερματικό, δώστε στον λογαριασμό του Home Assistant τα Remote: Parameters Settings (για τα πρόσωπα) και Remote: Log Search (για το ιστορικό)."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "last_access": {
+        "name": "Τελευταία πρόσβαση"
+      }
+    },
+    "button": {
+      "open_door": {
+        "name": "Άνοιγμα πόρτας {door}"
+      },
+      "refresh_people": {
+        "name": "Ανανέωση προσώπων"
+      }
+    },
+    "sensor": {
+      "last_access": {
+        "name": "Ώρα τελευταίας πρόσβασης"
+      },
+      "persons_enrolled": {
+        "name": "Καταχωρημένα πρόσωπα"
+      }
+    }
+  }
+}
