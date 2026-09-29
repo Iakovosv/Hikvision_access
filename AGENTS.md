@@ -1,0 +1,55 @@
+# Repository notes
+
+## What this is
+
+`hikvision_access` is a Home Assistant custom integration for Hikvision access control
+terminals (door stations), talking to the device over ISAPI. It is the sibling of the
+`Iakovosv/Hikvision_next` integration, which covers cameras and NVRs. Reference device:
+DS-K1T805MBFWX, firmware V1.9.1 build 240909.
+
+## Build and test
+
+- Python 3.14 is required by `pytest-homeassistant-custom-component>=0.13.363`.
+  A ready venv lives at `.venv`.
+- Run the suite with `.venv/bin/python -m pytest -q`.
+- Runtime deps: httpx, async-timeout. Test deps: pytest, pytest-asyncio, pytest-cov,
+  pytest-homeassistant-custom-component. Managed with `uv`.
+
+## Architecture
+
+- `isapi.py` — async ISAPI client. Digest/basic auth, lockout and permission errors are
+  told apart from a wrong password via `_auth_verified`. Person calls: `create_person`
+  (UserInfo/Record), `modify_person` (UserInfo/Modify), `delete_person`,
+  `get_users`, `get_person`, `get_person_count`, `set_card`, `delete_card`.
+- `coordinator.py` — polls `AcsEvent` and fires `hikvision_access_event`.
+- `config_flow.py` — setup, reconfigure, reauth. Exposes the options flow via
+  `async_get_options_flow`.
+- `options_flow.py` — **person management UI** (Configure button). Menu: add, edit,
+  delete, cards, open_door. Talks to the device through the coordinator client; stores no
+  options on the entry.
+- `services.py` / `services.yaml` — YAML equivalents (`create_visitor`, `delete_user`,
+  `open_door`).
+- `diagnostics.py` — redacted report; probes endpoints directly when setup failed (there
+  is no coordinator then).
+
+## Device facts that matter
+
+- A 401 on `AccessControl/AcsEvent` after a successful `System/deviceInfo` means the
+  device account lacks `Remote: Log Search / Interrogate Working Status`. It is not a
+  password problem. Also enable `Remote: Parameters Settings`.
+- `Calling Services` / NULL value: HA calls a service with an empty `{}` when a handler
+  edits and resubmits without touching the PIN field — treat empty PIN as "keep".
+- The reference firmware does not report visitor visit counters over ISAPI. Read them by
+  name when present (`VISIT_TIMES_*_KEYS` in `const.py`); never write a guessed field name.
+- Fingerprints cannot be enrolled remotely over ISAPI. Face needs a multipart upload to
+  `Intelligent/FDLib/FaceDataRecord`; the target device has no camera, so it is skipped.
+- `UserInfo Search` with `EmployeeNoList` is ignored by some firmware; `get_person` falls
+  back to a full paged scan.
+
+## Conventions
+
+- Keep changes minimal and preserve working behaviour.
+- Style: short docstrings, comments only for non-obvious invariants.
+- Every change: bump `manifest.json` + `CHANGELOG.md`, run the suite, then PR + release.
+- Tests patch the real client through the conftest transport handler; no mocks of the
+  integration's own code.
