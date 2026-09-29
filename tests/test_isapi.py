@@ -69,7 +69,7 @@ async def test_create_person_payload(session: httpx.AsyncClient) -> None:
     )
 
     request = captured[-1]
-    assert request.method == "PUT"
+    assert request.method == "POST"
     assert request.url.path.endswith("AccessControl/UserInfo/Record")
     user = decoder(request)["UserInfo"]
     assert user["employeeNo"] == "900001"
@@ -111,6 +111,57 @@ async def test_rejected_write_reports_the_device_reason(session: httpx.AsyncClie
     # The PIN we sent must never be echoed back into a log line.
     assert "123456" not in message
     assert "***" in message
+
+
+async def test_create_person_retries_with_put_when_post_is_refused() -> None:
+    """A firmware that only accepts PUT for UserInfo/Record is not left failing."""
+
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "Authorization" not in request.headers:
+            return httpx.Response(401, headers={"WWW-Authenticate": 'Digest realm="DS-1", nonce="abc"'})
+        if request.url.path.endswith("UserInfo/Record"):
+            seen.append(request.method)
+            if request.method == "POST":
+                return httpx.Response(
+                    400,
+                    json={"statusCode": 4, "statusString": "Invalid Operation", "subStatusCode": "methodNotAllowed"},
+                )
+            return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
+        return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
+
+    session = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = HikvisionAccessClient(HOST, "admin", "secret", session=session)
+
+    await client.create_person(employee_no="900001", name="Maria")
+
+    assert seen == ["POST", "PUT"]
+
+
+async def test_create_person_does_not_retry_a_real_rejection() -> None:
+    """A genuine payload error is raised, not hidden behind a pointless verb retry."""
+
+    from custom_components.hikvision_access.isapi import HikvisionAccessError
+
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "Authorization" not in request.headers:
+            return httpx.Response(401, headers={"WWW-Authenticate": 'Digest realm="DS-1", nonce="abc"'})
+        seen.append(request.method)
+        return httpx.Response(
+            400,
+            json={"statusCode": 6, "statusString": "Invalid Content", "subStatusCode": "badJsonContent"},
+        )
+
+    session = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = HikvisionAccessClient(HOST, "admin", "secret", session=session)
+
+    with pytest.raises(HikvisionAccessError):
+        await client.create_person(employee_no="900001", name="Maria")
+
+    assert seen == ["POST"]
 
 
 def test_masked_payload_blanks_credentials() -> None:

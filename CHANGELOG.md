@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.5
+
+- **Creating and editing a person now works on firmware that requires `POST`.** The device
+  answered `400 Invalid Operation (methodNotAllowed)` to `PUT AccessControl/UserInfo/Record`:
+  the ISAPI guide documents `POST` for this endpoint, while some builds accept `PUT`. The 0.6.4
+  diagnostic surfaced this exact sub-status, so the write is now sent with the documented verb
+  first and retried with the alternate one **only** when the device answers `methodNotAllowed`.
+  A genuine payload rejection is still raised untouched. Applied to `UserInfo/Record`,
+  `UserInfo/Modify`, `CardInfo/Record`, `CardInfo/Delete` and `UserInfo/Delete`.
+- Added tests covering both the verb fallback and the "do not retry a real error" case.
+
 ## 0.6.4
 
 - **Refused writes now explain themselves.** A rejected `UserInfo/Record` or `UserInfo/Modify`
