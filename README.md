@@ -14,8 +14,14 @@ which covers NVRs and IP cameras. Install both if you have cameras and an access
 - A `sensor.last_access_time` timestamp entity showing when someone last authenticated, with
   the name, employee number, card number and door as attributes. This is the "who entered and
   when" entity for a dashboard card.
-- One `button.open_door_N` per door, so a door can be unlocked from a dashboard or an
-  automation, not only from the gear menu
+- One `button.open_door_N` per door. The number of doors is read from the terminal, so a
+  single-door model shows one button, not a fixed pair. A door can be unlocked from a
+  dashboard or an automation, not only from the gear menu.
+- A `sensor.persons_enrolled` entity showing how many people are on the terminal. It does not
+  need the access event permission, and it is read from `UserInfo/Count` with a search
+  fallback for older firmware.
+- A `button.refresh_people` entity that re-reads the door and person details from the terminal.
+  Use it after granting the account its permissions instead of restarting Home Assistant.
 - A `hikvision_access_event` event fired on the Home Assistant event bus for every granted access, so
   automations can react to who entered
 - Person management from the Home Assistant UI: open the integration's `Configure` button to
