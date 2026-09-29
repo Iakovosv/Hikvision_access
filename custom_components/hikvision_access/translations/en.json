@@ -97,7 +97,8 @@
     },
     "error": {
       "device_error": "The device refused the request. Check the user permissions and the device log.",
-      "invalid_validity": "Valid until must be later than Valid from."
+      "invalid_validity": "Valid until must be later than Valid from.",
+      "insufficient_permission": "The device refused the request. Check the user permissions."
     },
     "abort": {
       "not_loaded": "The device is not set up. Fix the setup error on the integration page first.",

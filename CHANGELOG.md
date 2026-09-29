@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.1
+
+- Fixed a raw `insufficient_permission` shown at the top of "Add person": the key was added to
+  the config-flow errors in 0.6.0, but the options flow reads its errors from `options.error`.
+  Both tables now carry it.
+- The 401 message now names the one permission the refused endpoint needs instead of always
+  listing both. `AccessControl/UserInfo/*` asks for Remote: Parameters Settings and
+  `AccessControl/AcsEvent` for Remote: Log Search, so the user is not sent looking for a
+  setting that is already enabled.
+- `tests/test_translations.py` now reads the visible keys back from the flow source and asserts
+  every `reason=` and `errors["base"] =` literal resolves in every shipped language. The old
+  test only listed the aborts by hand, which is why `insufficient_permission` shipped raw.
+
 ## 0.6.0
 
 - Added a Greek translation (`translations/el.json`). Before this, a Home Assistant running in
