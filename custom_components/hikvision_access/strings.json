@@ -59,7 +59,7 @@
       },
       "edit_form": {
         "title": "Edit person",
-        "description": "Editing {name} (ID {employee_no}).\nPerson type: {user_type} | Gender: {gender}\nValidity: {validity} | Cards: {cards} | Fingerprints: {fingerprints}\nVisit times: {visits}\n\nLeave the PIN empty to keep the current one. Leave the card number as it is to keep the current card, or type a new one to replace it. Fingerprints can only be enrolled on the device itself.",
+        "description": "Editing {name} (ID {employee_no}).\nPerson type: {user_type} | Gender: {gender} | PIN: {pin}\nValidity: {validity} | Cards: {cards} | Fingerprints: {fingerprints}\nVisit times: {visits}\n\nLeave the PIN empty to keep the current one. Leave the card number as it is to keep the current card, or type a new one to replace it. Fingerprints can only be enrolled on the device itself.",
         "data": {
           "employee_no": "Employee ID",
           "name": "Name",
