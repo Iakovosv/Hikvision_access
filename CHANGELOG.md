@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0
+
+- Manage people from the Home Assistant UI. The integration's `Configure` button now opens a
+  person management menu: add a person, edit one, delete one, change a card, or open a door.
+  No YAML service call is needed.
+  - `Add person` covers employee ID, name, gender, person type, PIN, card and the validity
+    window. An empty employee ID is allocated automatically and an empty PIN is generated.
+  - `Edit person` lists the people enrolled on the device and prefills the form with what the
+    device holds, including the read-only details (person type, gender, validity, card and
+    fingerprint counts, and the visitor visit counters when the device reports them).
+    The PIN is only changed when a new one is entered.
+  - `Delete person` asks for confirmation first.
+  - `Manage card` adds a card number, or removes the person's cards when submitted empty.
+- `create_visitor` gained the `gender`, `user_type` and `card_no` fields.
+- The ISAPI client gained `modify_person`, `get_person`, `get_person_count`, `set_card` and
+  `delete_card`.
+
 ## 0.2.2
 
 - Diagnostics now run the endpoint probes even when setup failed. That is the case where

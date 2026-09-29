@@ -14,16 +14,21 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     ATTR_BEGIN_TIME,
+    ATTR_CARD_NO,
     ATTR_DOOR_NO,
     ATTR_EMPLOYEE_NO,
     ATTR_END_TIME,
+    ATTR_GENDER,
     ATTR_NAME,
     ATTR_PIN,
+    ATTR_USER_TYPE,
     DOMAIN,
     EVENT_VISITOR_CREATED,
+    GENDERS,
     SERVICE_CREATE_VISITOR,
     SERVICE_DELETE_USER,
     SERVICE_OPEN_DOOR,
+    USER_TYPES,
 )
 from .coordinator import HikvisionAccessCoordinator
 from .isapi import HikvisionAccessError
@@ -38,6 +43,9 @@ CREATE_VISITOR_SCHEMA = vol.Schema(
         vol.Optional(ATTR_EMPLOYEE_NO): vol.All(cv.string, vol.Length(min=1, max=32)),
         vol.Optional(ATTR_PIN): vol.All(cv.string, vol.Length(min=4, max=8)),
         vol.Optional(ATTR_DOOR_NO, default=1): vol.Coerce(int),
+        vol.Optional(ATTR_GENDER): vol.In(GENDERS),
+        vol.Optional(ATTR_USER_TYPE, default="visitor"): vol.In(USER_TYPES),
+        vol.Optional(ATTR_CARD_NO): cv.string,
     }
 )
 
@@ -87,6 +95,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             end_time=end,
             pin=pin,
             door_no=call.data[ATTR_DOOR_NO],
+            gender=call.data.get(ATTR_GENDER),
+            user_type=call.data.get(ATTR_USER_TYPE, "visitor"),
+            card_no=(call.data.get(ATTR_CARD_NO) or "").strip() or None,
         )
 
         hass.bus.async_fire(

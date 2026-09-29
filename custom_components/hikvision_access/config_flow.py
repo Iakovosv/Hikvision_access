@@ -14,10 +14,12 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
 )
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME, CONF_VERIFY_SSL
+from homeassistant.core import callback
 from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import DOMAIN
 from .isapi import HikvisionAccessAuthError, HikvisionAccessClient, HikvisionAccessError
+from .options_flow import HikvisionAccessOptionsFlow
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,6 +29,13 @@ class HikvisionAccessConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
     _entry: Any
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry) -> HikvisionAccessOptionsFlow:
+        """Return the person management options flow."""
+
+        return HikvisionAccessOptionsFlow(config_entry)
 
     async def get_schema(self, user_input: dict[str, Any]):
         """Return the configuration schema."""
