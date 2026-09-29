@@ -28,11 +28,13 @@ ACCESS_EVENT = {
 }
 
 
-async def _setup(hass: HomeAssistant, monkeypatch, events=None):
+async def _setup(hass: HomeAssistant, monkeypatch, events=None, **handler_kwargs):
     """Set up the integration against the fake terminal and return the entry."""
 
     captured: list[httpx.Request] = []
-    session = httpx.AsyncClient(transport=httpx.MockTransport(make_handler(events or [], captured)))
+    session = httpx.AsyncClient(
+        transport=httpx.MockTransport(make_handler(events or [], captured, **handler_kwargs))
+    )
 
     monkeypatch.setattr("custom_components.hikvision_access.get_async_client", lambda *a, **k: session)
 
@@ -53,6 +55,34 @@ async def _setup(hass: HomeAssistant, monkeypatch, events=None):
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     return entry, captured
+
+
+async def _setup_expecting_failure(hass: HomeAssistant, monkeypatch, **handler_kwargs):
+    """Add an entry that is expected to fail setup, and return it."""
+
+    captured: list[httpx.Request] = []
+    session = httpx.AsyncClient(
+        transport=httpx.MockTransport(make_handler([], captured, **handler_kwargs))
+    )
+    monkeypatch.setattr("custom_components.hikvision_access.get_async_client", lambda *a, **k: session)
+
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Front Door",
+        data={
+            "host": "http://192.0.2.10",
+            "username": "admin",
+            "password": "secret",
+            "verify_ssl": True,
+        },
+        unique_id=DEVICE_INFO["DeviceInfo"]["serialNumber"],
+    )
+    entry.add_to_hass(hass)
+    assert not await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
 
 
 async def test_setup_registers_device_and_binary_sensor(hass: HomeAssistant, monkeypatch) -> None:
@@ -140,3 +170,34 @@ async def test_open_door_service(hass: HomeAssistant, monkeypatch) -> None:
 
     door = [r for r in captured if r.url.path.endswith("RemoteControl/door/1")][-1]
     assert b"<cmd>open</cmd>" in door.content
+
+
+async def test_setup_without_event_permission_fails_with_actionable_error(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """A valid account missing event permission does not enter a reauth loop."""
+
+    entry = await _setup_expecting_failure(hass, monkeypatch, denied_paths={"AccessControl/AcsEvent"})
+
+    from homeassistant.config_entries import ConfigEntryState
+
+    # Not SETUP_RETRY (which would loop for a cause that cannot recover on its own) and
+    # not requiring reauthentication, because the password is fine.
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+
+
+async def test_diagnostics_redact_credentials(hass: HomeAssistant, monkeypatch) -> None:
+    """Diagnostics hide the host and credentials and report the probe result."""
+
+    entry, _ = await _setup(hass, monkeypatch, [ACCESS_EVENT])
+
+    from custom_components.hikvision_access.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+
+    diagnostics = await async_get_config_entry_diagnostics(hass, entry)
+    assert diagnostics["probe"]["access_events"] == "ok"
+    assert diagnostics["probe"]["device_info"] == "ok"
+    dumped = str(diagnostics["entry"])
+    assert "secret" not in dumped
+    assert "192.0.2.10" not in dumped

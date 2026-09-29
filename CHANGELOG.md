@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1
+
+- Stop reporting a permission problem as a wrong password. ISAPI answers 401 both when
+  the password is wrong and when the account may not read access events, so the two are
+  now told apart: a valid account that is refused an endpoint raises a permission error
+  and the entry stays loaded instead of looping through reauthentication with the
+  correct password.
+- Detect the device lockout that follows repeated failed logins (its 401 body carries
+  `lockStatus`/`unlockTime`) and report it as a temporary condition instead of asking
+  for credentials.
+- Add diagnostics, with host and credentials redacted, that probe both `System/deviceInfo`
+  and `AccessControl/AcsEvent` so a support report shows which call the account may use.
+
 ## 0.2.0
 
 - Follow AcsEvent pagination so busy periods no longer drop entries.
