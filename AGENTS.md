@@ -44,9 +44,19 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
 
 ## Device facts that matter
 
-- A 401 on `AccessControl/AcsEvent` after a successful `System/deviceInfo` means the
-  device account lacks `Remote: Log Search / Interrogate Working Status`. It is not a
-  password problem. Also enable `Remote: Parameters Settings`.
+- **The terminal accepts each digest nonce only once.** httpx caches the digest challenge
+  and reuses it (encode/httpx PR #2463), so from the second request on the client sends a
+  spent nonce. The device refuses with a bare 401 that advertises **no** fresh
+  `WWW-Authenticate`, so httpx cannot re-negotiate; the request just fails. This looked
+  exactly like a missing permission and shipped wrong guidance for weeks (`System/deviceInfo`
+  passes, every `AccessControl/*` call 401s, even for `admin`). `request()` now re-negotiates
+  and retries once on a 401 before the permission logic runs, and only when `_auth_verified`
+  is set so a wrong password does not add login attempts. Verify any similar 401 with a plain
+  `curl --digest` against the device: if curl returns 200 with the same credentials, it is
+  this bug, not a permission.
+- A 401 on `AccessControl/AcsEvent` **after** the nonce fix really is a permission problem:
+  the account lacks `Remote: Log Search / Interrogate Working Status`. But confirm it with
+  curl first — do not trust the status code alone.
 - The two permissions map to different features, so name both when a user is stuck:
   `Remote: Parameters Settings` covers `/AccessControl/UserInfo/*` (the person list, the
   person count, add/edit/delete), `Remote: Log Search` covers `/AccessControl/AcsEvent`

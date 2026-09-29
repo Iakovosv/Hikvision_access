@@ -179,10 +179,21 @@ class HikvisionAccessClient:
         await self._detect_auth()
 
         url = f"{self.host}/ISAPI/{path}"
-        try:
-            response = await self._session.request(method, url, data=data, auth=self._auth, headers=headers)
-        except httpx.HTTPError as ex:
-            raise HikvisionAccessError(f"Cannot reach {url}: {ex}") from ex
+        response = await self._send(method, url, data, headers)
+
+        if (
+            response.status_code == httpx.codes.UNAUTHORIZED
+            and self._auth_verified
+            and not self._is_lockout(response)
+        ):
+            # The terminal accepts each digest nonce only once. httpx caches the
+            # challenge and reuses it, so a later request carries a spent nonce and the
+            # device refuses with a 401 that advertises no fresh challenge; httpx cannot
+            # recover on its own. Negotiate a new nonce and send the request once more
+            # before reading the 401 as a permission problem. Only done once the
+            # credentials are known good, so a wrong password does not add logins.
+            await self._refresh_auth()
+            response = await self._send(method, url, data, headers)
 
         if response.status_code == httpx.codes.UNAUTHORIZED:
             raise await self._unauthorized_error(url, response)
@@ -203,6 +214,28 @@ class HikvisionAccessClient:
         except ValueError:
             # Command style endpoints answer with XML; the caller only needs success.
             return {"raw": response.text}
+
+    async def _send(
+        self,
+        method: str,
+        url: str,
+        data: str | None,
+        headers: dict[str, str] | None,
+    ) -> httpx.Response:
+        """Send one request, turning a transport failure into a client error."""
+
+        try:
+            return await self._session.request(
+                method, url, data=data, auth=self._auth, headers=headers
+            )
+        except httpx.HTTPError as ex:
+            raise HikvisionAccessError(f"Cannot reach {url}: {ex}") from ex
+
+    async def _refresh_auth(self) -> None:
+        """Re-negotiate the digest challenge after the cached nonce was refused."""
+
+        self._auth = None
+        await self._detect_auth()
 
     async def get_device_info(self) -> dict[str, Any]:
         """Return DeviceInfo from the device."""
