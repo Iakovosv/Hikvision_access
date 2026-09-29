@@ -461,11 +461,31 @@ class HikvisionAccessClient:
             position += len(page)
 
     async def get_person_count(self) -> int:
-        """Return the number of persons enrolled on the device."""
+        """Return the number of persons enrolled on the device.
 
-        body = await self.request("GET", "AccessControl/UserInfo/Count?format=json")
+        The count endpoint is what readiness checks ask first, so it is used when the
+        firmware has it. Older firmware answers the search instead, and the total is
+        read from there. Returns 0 when neither answers.
+        """
+
         try:
-            return int(body.get("UserInfoCount", {}).get("userNumber", 0))
+            body = await self.request("GET", "AccessControl/UserInfo/Count?format=json")
+        except HikvisionAccessError:
+            body = None
+        if body:
+            try:
+                return int(body.get("UserInfoCount", {}).get("userNumber", 0))
+            except (TypeError, ValueError):  # pragma: no cover - defensive against odd firmware
+                return 0
+
+        body = await self.request(
+            "POST",
+            "AccessControl/UserInfo/Search?format=json",
+            data=_json({"UserInfoSearchCond": {"searchID": "1", "maxResults": 1, "searchResultPosition": 0}}),
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            return int(body.get("UserInfoSearch", {}).get("totalMatches", 0))
         except (TypeError, ValueError):  # pragma: no cover - defensive against odd firmware
             return 0
 
