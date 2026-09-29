@@ -38,6 +38,24 @@ class HikvisionAccessPermissionError(HikvisionAccessForbiddenError):
     """
 
 
+#: ISAPI groups its endpoints under permissions the terminal grants per user. Naming the
+#: right one in a 401 avoids sending the user to enable both when only one is missing.
+_PERMISSION_HINTS: tuple[tuple[str, str], ...] = (
+    ("AccessControl/AcsEvent", "Remote: Log Search"),
+    ("AccessControl/UserInfo", "Remote: Parameters Settings"),
+    ("AccessControl/Door", "Remote: Parameters Settings"),
+)
+
+
+def _permission_hint(url: str) -> str:
+    """Name the device permission that covers an endpoint."""
+
+    for fragment, permission in _PERMISSION_HINTS:
+        if fragment in url:
+            return permission
+    return "Remote: Log Search and Remote: Parameters Settings"
+
+
 class HikvisionAccessClient:
     """Small async ISAPI client for Hikvision access control terminals.
 
@@ -120,8 +138,8 @@ class HikvisionAccessClient:
         if self._auth_verified or await self._verify_auth():
             return HikvisionAccessPermissionError(
                 f"Authenticated, but the device refused {url} (401). The account is missing a "
-                "permission for this endpoint. On an access terminal, enable Remote: Log Search "
-                "and Remote: Parameters Settings for the user."
+                f"permission for this endpoint. On an access terminal, enable {_permission_hint(url)} "
+                "for the user."
             )
 
         return HikvisionAccessAuthError(f"Unauthorized request {url}, check username and password")
