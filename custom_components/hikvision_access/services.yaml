@@ -1,6 +1,6 @@
 create_visitor:
   name: Create visitor
-  description: Create a visitor on the access control terminal with a validity window and a PIN.
+  description: Create a visitor on the access control terminal with a validity window and a PIN. Newer firmware can also do this from the integration's Configure button.
   fields:
     name:
       name: Name
@@ -30,6 +30,29 @@ create_visitor:
     employee_no:
       name: Employee number
       description: Internal identifier on the terminal. Allocated automatically when omitted.
+      selector:
+        text:
+    gender:
+      name: Gender
+      description: Optional gender recorded on the terminal.
+      selector:
+        select:
+          options:
+            - male
+            - female
+            - unknown
+    user_type:
+      name: Person type
+      description: Normal for staff, visitor for a temporary guest.
+      default: visitor
+      selector:
+        select:
+          options:
+            - normal
+            - visitor
+    card_no:
+      name: Card number
+      description: Optional card number to link to the visitor.
       selector:
         text:
     door_no:

@@ -89,9 +89,17 @@ def make_handler(
             return httpx.Response(200, json={"AcsEvent": _event_page(request, events, page_size)})
         if suffix.endswith("AccessControl/UserInfo/Search"):
             return httpx.Response(200, json={"UserInfoSearch": _user_page(request, users, page_size)})
+        if suffix.endswith("AccessControl/UserInfo/Count"):
+            return httpx.Response(200, json={"UserInfoCount": {"userNumber": len(users)}})
         if suffix.endswith("AccessControl/UserInfo/Record"):
             return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
+        if suffix.endswith("AccessControl/UserInfo/Modify"):
+            return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
         if suffix.endswith("AccessControl/UserInfo/Delete"):
+            return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
+        if suffix.endswith("AccessControl/CardInfo/Record"):
+            return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
+        if suffix.endswith("AccessControl/CardInfo/Delete"):
             return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
         if suffix.endswith("RemoteControl/door/1"):
             return httpx.Response(200, text="<ResponseStatus><statusCode>1</statusCode></ResponseStatus>")

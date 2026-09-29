@@ -23,6 +23,104 @@
       "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Person management",
+        "menu_options": {
+          "add": "Add person",
+          "edit": "Edit person",
+          "delete": "Delete person",
+          "cards": "Manage card",
+          "open_door": "Open door"
+        }
+      },
+      "add": {
+        "title": "Add person",
+        "description": "Create a person on the terminal. Leave the employee number empty to allocate one automatically, and the PIN empty to generate a random one.",
+        "data": {
+          "employee_no": "Employee ID",
+          "name": "Name",
+          "gender": "Gender",
+          "user_type": "Person type",
+          "pin": "PIN",
+          "validity_enabled": "Limit the validity period",
+          "begin_time": "Valid from",
+          "end_time": "Valid until",
+          "card_no": "Card number",
+          "door_no": "Door"
+        }
+      },
+      "edit": {
+        "title": "Edit person",
+        "description": "Choose the person to change.",
+        "data": {
+          "employee_no": "Person"
+        }
+      },
+      "edit_form": {
+        "title": "Edit person",
+        "description": "Editing {name} (ID {employee_no}).\nPerson type: {user_type} | Gender: {gender}\nValidity: {validity} | Cards: {cards} | Fingerprints: {fingerprints}\nVisit times: {visits}\n\nLeave the PIN empty to keep the current one. Fingerprints can only be enrolled on the device itself.",
+        "data": {
+          "employee_no": "Employee ID",
+          "name": "Name",
+          "gender": "Gender",
+          "user_type": "Person type",
+          "pin": "PIN",
+          "validity_enabled": "Limit the validity period",
+          "begin_time": "Valid from",
+          "end_time": "Valid until",
+          "card_no": "Card number",
+          "door_no": "Door"
+        }
+      },
+      "delete": {
+        "title": "Delete person",
+        "description": "Choose the person to delete.",
+        "data": {
+          "employee_no": "Person"
+        }
+      },
+      "delete_confirm": {
+        "title": "Delete person",
+        "description": "Delete person {employee_no} from the terminal? This cannot be undone.",
+        "data": {
+          "confirm": "Yes, delete this person"
+        }
+      },
+      "cards": {
+        "title": "Manage card",
+        "description": "Choose the person whose card you want to change.",
+        "data": {
+          "employee_no": "Person"
+        }
+      },
+      "card_form": {
+        "title": "Manage card",
+        "description": "Current cards: {cards}\n\nEnter a card number to add it, or leave the field empty and submit to remove every card.",
+        "data": {
+          "card_no": "Card number"
+        }
+      },
+      "open_door": {
+        "title": "Open door",
+        "description": "Unlock a door once.",
+        "data": {
+          "door_no": "Door"
+        }
+      }
+    },
+    "error": {
+      "device_error": "The device refused the request. Check the user permissions and the device log.",
+      "invalid_validity": "Valid until must be later than Valid from."
+    },
+    "abort": {
+      "not_loaded": "The device is not set up. Fix the setup error on the integration page first.",
+      "no_persons": "No persons are enrolled on the terminal.",
+      "person_gone": "That person no longer exists on the terminal.",
+      "delete_cancelled": "Deletion cancelled."
+    }
+  },
   "entity": {
     "binary_sensor": {
       "last_access": {
