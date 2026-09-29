@@ -92,6 +92,32 @@ async def _probe_endpoints(
                 }
             ),
         ),
+        (
+            "person_list",
+            "POST",
+            "AccessControl/UserInfo/Search?format=json",
+            json.dumps(
+                {
+                    "UserInfoSearchCond": {
+                        "searchID": "hikvision-access-diagnostics",
+                        "searchResultPosition": 0,
+                        "maxResults": 1,
+                    }
+                }
+            ),
+        ),
+        (
+            "person_count",
+            "GET",
+            "AccessControl/UserInfo/Count?format=json",
+            None,
+        ),
+        (
+            "door_count",
+            "GET",
+            "AccessControl/Door/Count?format=json",
+            None,
+        ),
     )
 
     result: dict[str, str] = {}

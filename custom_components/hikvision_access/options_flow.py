@@ -37,7 +37,7 @@ from .const import (
     VISIT_TIMES_TOTAL_KEYS,
     VISIT_TIMES_USED_KEYS,
 )
-from .isapi import HikvisionAccessError
+from .isapi import HikvisionAccessError, HikvisionAccessForbiddenError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -157,6 +157,9 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
         if user_input is not None:
             try:
                 await self._create(user_input)
+            except HikvisionAccessForbiddenError as ex:
+                errors["base"] = "insufficient_permission"
+                _LOGGER.error("Could not create the person: %s", ex)
             except HikvisionAccessError as ex:
                 errors["base"] = "device_error"
                 _LOGGER.error("Could not create the person: %s", ex)
