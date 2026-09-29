@@ -30,8 +30,28 @@ from .const import (
     ATTR_PIN,
     ATTR_USER_TYPE,
     ATTR_VALIDITY_ENABLED,
+    CONF_NOTIFY_ALL,
+    CONF_NOTIFY_DENIED,
+    CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_MESSAGE,
+    CONF_NOTIFY_NAMES,
+    CONF_NOTIFY_NAMED_MESSAGE,
+    CONF_NOTIFY_NAMED_TITLE,
+    CONF_NOTIFY_SERVICE,
+    CONF_NOTIFY_TITLE,
+    CONF_TTS_ENABLED,
+    CONF_TTS_ALL,
+    CONF_TTS_ENTITY,
+    CONF_TTS_MESSAGE,
+    CONF_TTS_MEDIA_PLAYER,
+    DEFAULT_NOTIFY_MESSAGE,
+    DEFAULT_NOTIFY_NAMED_MESSAGE,
+    DEFAULT_NOTIFY_NAMED_TITLE,
+    DEFAULT_NOTIFY_TITLE,
+    DEFAULT_TTS_MESSAGE,
     DOMAIN,
     GENDERS,
+    NOTIFICATION_PLACEHOLDERS,
     USER_TYPES,
     VISIT_TIMES_REMAINING_KEYS,
     VISIT_TIMES_TOTAL_KEYS,
@@ -45,6 +65,7 @@ MENU_ADD = "add"
 MENU_EDIT = "edit"
 MENU_DELETE = "delete"
 MENU_OPEN_DOOR = "open_door"
+MENU_NOTIFICATIONS = "notifications"
 
 # A generated PIN is six digits; the device accepts four to eight.
 GENERATED_PIN_DIGITS = 6
@@ -147,7 +168,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
 
         return self.async_show_menu(
             step_id="init",
-            menu_options=[MENU_ADD, MENU_EDIT, MENU_DELETE, MENU_OPEN_DOOR],
+            menu_options=[MENU_ADD, MENU_EDIT, MENU_DELETE, MENU_OPEN_DOOR, MENU_NOTIFICATIONS],
         )
 
     async def async_step_add(self, user_input: dict[str, Any] | None = None):
@@ -166,7 +187,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             except HomeAssistantError as ex:
                 errors["base"] = str(ex)
             else:
-                return self.async_create_entry(title="", data={})
+                return self.async_create_entry(title="", data=dict(self._entry.options))
 
         return self.async_show_form(
             step_id="add",
@@ -219,7 +240,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             except HomeAssistantError as ex:
                 errors["base"] = str(ex)
             else:
-                return self.async_create_entry(title="", data={})
+                return self.async_create_entry(title="", data=dict(self._entry.options))
 
         return self.async_show_form(
             step_id="edit_form",
@@ -274,7 +295,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
                     data_schema=self._confirm_schema(),
                     errors={"base": "device_error"},
                 )
-            return self.async_create_entry(title="", data={})
+            return self.async_create_entry(title="", data=dict(self._entry.options))
 
         return self.async_show_form(
             step_id="delete_confirm",
@@ -296,9 +317,94 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
                     data_schema=self._door_schema(),
                     errors={"base": "device_error"},
                 )
-            return self.async_create_entry(title="", data={})
+            return self.async_create_entry(title="", data=dict(self._entry.options))
 
         return self.async_show_form(step_id="open_door", data_schema=self._door_schema())
+
+    async def async_step_notifications(self, user_input: dict[str, Any] | None = None):
+        """Configure the optional phone notification and the spoken announcement."""
+
+        if self._entry.state is not ConfigEntryState.LOADED:
+            return self.async_abort(reason="not_loaded")
+
+        if user_input is not None:
+            options = dict(self._entry.options)
+            options.update(user_input)
+            return self.async_create_entry(title="", data=options)
+
+        return self.async_show_form(
+            step_id="notifications",
+            data_schema=self._notifications_schema(),
+            description_placeholders={
+                "placeholders": ", ".join(f"{{{name}}}" for name in NOTIFICATION_PLACEHOLDERS)
+            },
+        )
+
+    def _notifications_schema(self) -> vol.Schema:
+        """Build the notification settings form from the current options."""
+
+        options = self._entry.options
+        return vol.Schema(
+            {
+                vol.Optional(
+                    CONF_NOTIFY_ENABLED, default=bool(options.get(CONF_NOTIFY_ENABLED, False))
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_NOTIFY_SERVICE, default=str(options.get(CONF_NOTIFY_SERVICE) or "")
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="notify", multiple=False)
+                ),
+                vol.Optional(
+                    CONF_NOTIFY_TITLE,
+                    default=str(options.get(CONF_NOTIFY_TITLE) or DEFAULT_NOTIFY_TITLE),
+                ): selector.TextSelector(),
+                vol.Optional(
+                    CONF_NOTIFY_MESSAGE,
+                    default=str(
+                        options.get(CONF_NOTIFY_MESSAGE) or DEFAULT_NOTIFY_MESSAGE
+                    ),
+                ): selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
+                vol.Optional(
+                    CONF_NOTIFY_ALL, default=bool(options.get(CONF_NOTIFY_ALL, False))
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_NOTIFY_NAMES, default=str(options.get(CONF_NOTIFY_NAMES) or "")
+                ): selector.TextSelector(),
+                vol.Optional(
+                    CONF_NOTIFY_NAMED_TITLE,
+                    default=str(options.get(CONF_NOTIFY_NAMED_TITLE) or DEFAULT_NOTIFY_NAMED_TITLE),
+                ): selector.TextSelector(),
+                vol.Optional(
+                    CONF_NOTIFY_NAMED_MESSAGE,
+                    default=str(
+                        options.get(CONF_NOTIFY_NAMED_MESSAGE) or DEFAULT_NOTIFY_NAMED_MESSAGE
+                    ),
+                ): selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
+                vol.Optional(
+                    CONF_NOTIFY_DENIED, default=bool(options.get(CONF_NOTIFY_DENIED, False))
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_TTS_ENABLED, default=bool(options.get(CONF_TTS_ENABLED, False))
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_TTS_ALL, default=bool(options.get(CONF_TTS_ALL, False))
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_TTS_ENTITY, default=str(options.get(CONF_TTS_ENTITY) or "")
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="tts", multiple=False)
+                ),
+                vol.Optional(
+                    CONF_TTS_MEDIA_PLAYER, default=str(options.get(CONF_TTS_MEDIA_PLAYER) or "")
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="media_player", multiple=False)
+                ),
+                vol.Optional(
+                    CONF_TTS_MESSAGE,
+                    default=str(options.get(CONF_TTS_MESSAGE) or DEFAULT_TTS_MESSAGE),
+                ): selector.TextSelector(),
+            }
+        )
 
     async def _create(self, user_input: dict[str, Any]) -> None:
         """Create a person, allocating an employee number and PIN when omitted."""

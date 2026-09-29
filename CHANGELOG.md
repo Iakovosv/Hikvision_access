@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.8
+
+- **Optional notification when someone enters.** Open `Configure` and choose
+  `Notifications & announcements`. Nothing is sent until you turn it on. Pick the notify
+  service of the device you want to reach (your phone, Telegram, e-mail) and choose whether
+  every entry is reported (`Notify me for every entry`) or only certain names
+  (`Names to watch`, comma separated). A watched name gets its own title and message, so a
+  cleaner or a carer can be told apart from the household. A switch also reports a refused
+  authentication. The message names the person and takes `{name}`, `{employee_no}`,
+  `{card_no}`, `{door}`, `{method}`, `{time}`, `{date}` and `{device}`; a placeholder that is
+  not recognised is left untouched.
+- **Optional spoken announcement.** Turn on `Enable announcements`, pick a text-to-speech
+  engine and the speaker (a Google Nest, for example) and set what it says, e.g.
+  `Καλώς ήρθες {name}`. The announcement is a fixed sentence rather than the live message.
+- **A blueprint for the lights.** `Hikvision - turn on lights when the door opens` is
+  installed into your configuration on first setup and shows up under
+  `Settings / Automations & Scenes / Blueprints`. Pick the lights, brightness and how long to
+  leave them on, and optionally restrict it to one person.
+- The notification settings live in the entry options, so adding, editing or deleting a
+  person no longer clears them, and turning them on or off reloads the entry so the change
+  takes effect at once.
+
 ## 0.6.7
 
 - **Access events are visible again, and they name the person.** The poll asked the device
