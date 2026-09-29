@@ -1,4 +1,9 @@
-"""The logbook line for an access event names the person and how they opened the door."""
+"""The logbook line for an access event names the person and how they opened the door.
+
+`hassfest` forbids a `logbook` translation category, so the strings live in the platform and
+these tests pin them: the line must name the person, must not read as a raw key, and must
+follow the Home Assistant language.
+"""
 
 from __future__ import annotations
 
@@ -46,6 +51,7 @@ async def test_granted_event_shows_the_person_the_card_and_the_door(hass, monkey
     assert result["name"] == "House cleaner"
     assert "House cleaner" in result["message"]
     assert "2673003718" in result["message"]
+    assert "door 1" in result["message"]
 
 
 async def test_granted_event_without_a_card_has_no_card_in_the_line(hass, monkeypatch) -> None:
@@ -58,6 +64,7 @@ async def test_granted_event_without_a_card_has_no_card_in_the_line(hass, monkey
 
     assert result["name"] == "Maria"
     assert "Maria" in result["message"]
+    assert "fingerprint" in result["message"]
 
 
 async def test_denied_event_is_reported_as_denied(hass, monkeypatch) -> None:
@@ -69,7 +76,7 @@ async def test_denied_event_is_reported_as_denied(hass, monkeypatch) -> None:
     )
 
     assert result["name"] == "Maria"
-    assert result["message"] != ""
+    assert "refused" in result["message"]
 
 
 async def test_name_falls_back_to_the_employee_number(hass, monkeypatch) -> None:
@@ -100,8 +107,19 @@ async def test_greek_line_is_translated(hass, monkeypatch) -> None:
         )
     )
 
-    assert result["message"] != "granted_with_card"
     assert "Καθαρίστρια" in result["message"]
+    assert "κάρτα" in result["message"]
+
+
+async def test_unknown_language_falls_back_to_english(hass, monkeypatch) -> None:
+    """A language with no strings of its own still gets a readable line."""
+
+    hass.config.language = "de"
+    describe = await _describe(hass, monkeypatch)
+    result = describe(_Event({"name": "Maria", "card_no": None, "door_no": 2, "granted": True}))
+
+    assert "Maria" in result["message"]
+    assert "opened the door" in result["message"]
 
 
 async def test_event_type_is_the_one_the_coordinator_fires(hass, monkeypatch) -> None:
