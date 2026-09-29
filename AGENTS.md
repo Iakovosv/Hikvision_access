@@ -20,8 +20,11 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
 - `isapi.py` — async ISAPI client. Digest/basic auth, lockout and permission errors are
   told apart from a wrong password via `_auth_verified`. Person calls: `create_person`
   (UserInfo/Record), `modify_person` (UserInfo/Modify), `delete_person`,
-  `get_users`, `get_person`, `get_person_count`, `set_card`, `delete_card`.
-- `coordinator.py` — polls `AcsEvent` and fires `hikvision_access_event`.
+  `get_users`, `get_person`, `get_person_count`, `set_card`, `delete_card`, `open_door`,
+  `get_door_count`.
+- `coordinator.py` — polls `AcsEvent` and fires `hikvision_access_event`. Holds
+  `door_numbers`, filled at setup from the device; defaults to `[1]` so a terminal that
+  cannot be asked is never shown doors it lacks.
 - `config_flow.py` — setup, reconfigure, reauth. Exposes the options flow via
   `async_get_options_flow`.
 - `options_flow.py` — **person management UI** (Configure button). Menu: add, edit, delete,
@@ -56,6 +59,9 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
   `Intelligent/FDLib/FaceDataRecord`; the target device has no camera, so it is skipped.
 - `UserInfo Search` with `EmployeeNoList` is ignored by some firmware; `get_person` falls
   back to a full paged scan.
+- The number of doors differs by model. Ask `AccessControl/Door/Count`, else walk
+  `System/capabilities`, and expose only what is reported; some terminals are single door.
+  A 404 on an endpoint is a normal "not supported", not an error to surface.
 
 ## Conventions
 
