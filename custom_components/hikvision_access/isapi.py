@@ -294,16 +294,92 @@ class HikvisionAccessClient:
         end_time: dt.datetime | None = None,
         pin: str | None = None,
         door_no: int = 1,
+        gender: str | None = None,
+        user_type: str = "normal",
+        card_no: str | None = None,
     ) -> dict[str, Any]:
-        """Create or update a person, optionally with a PIN and a validity window."""
+        """Create or replace a person, optionally with a PIN, a card and a validity window."""
+
+        user_info = self._person_payload(
+            employee_no=employee_no,
+            name=name,
+            begin_time=begin_time,
+            end_time=end_time,
+            pin=pin,
+            door_no=door_no,
+            gender=gender,
+            user_type=user_type,
+        )
+
+        result = await self.request(
+            "PUT",
+            "AccessControl/UserInfo/Record?format=json",
+            data=_json({"UserInfo": user_info}),
+            headers={"Content-Type": "application/json"},
+        )
+
+        if card_no:
+            await self.set_card(employee_no, card_no)
+
+        return result
+
+    async def modify_person(
+        self,
+        employee_no: str,
+        name: str | None = None,
+        begin_time: dt.datetime | None = None,
+        end_time: dt.datetime | None = None,
+        pin: str | None = None,
+        door_no: int = 1,
+        gender: str | None = None,
+        user_type: str = "normal",
+    ) -> dict[str, Any]:
+        """Update an existing person without dropping its cards or fingerprints.
+
+        The device's UserInfo/Modify merges the supplied fields into the stored record,
+        so credentials that are not part of this call are left alone.
+        """
+
+        user_info = self._person_payload(
+            employee_no=employee_no,
+            name=name,
+            begin_time=begin_time,
+            end_time=end_time,
+            pin=pin,
+            door_no=door_no,
+            gender=gender,
+            user_type=user_type,
+        )
+        return await self.request(
+            "PUT",
+            "AccessControl/UserInfo/Modify?format=json",
+            data=_json({"UserInfo": user_info}),
+            headers={"Content-Type": "application/json"},
+        )
+
+    @staticmethod
+    def _person_payload(
+        employee_no: str,
+        name: str | None,
+        begin_time: dt.datetime | None,
+        end_time: dt.datetime | None,
+        pin: str | None,
+        door_no: int,
+        gender: str | None,
+        user_type: str,
+    ) -> dict[str, Any]:
+        """Build the UserInfo body shared by create and modify."""
 
         user_info: dict[str, Any] = {
             "employeeNo": str(employee_no),
-            "name": name,
-            "userType": "normal",
+            "userType": user_type,
             "doorRight": "1",
             "RightPlan": [{"doorNo": door_no, "planTemplateNo": "1"}],
         }
+        if name:
+            user_info["name"] = name
+        if gender:
+            user_info["gender"] = gender
         if pin:
             user_info["password"] = str(pin)
         if begin_time and end_time:
@@ -313,11 +389,77 @@ class HikvisionAccessClient:
                 "endTime": _isapi_time(end_time),
                 "timeType": "local",
             }
+        return user_info
 
+    async def get_person(self, employee_no: str) -> dict[str, Any] | None:
+        """Return one person by employee number, or None when the device has no match.
+
+        The EmployeeNoList filter is not honoured by every firmware, so a miss falls back
+        to paging the enrolment list rather than reporting the person as gone.
+        """
+
+        payload = {
+            "UserInfoSearchCond": {
+                "searchID": "hikvision-access",
+                "searchResultPosition": 0,
+                "maxResults": 1,
+                "EmployeeNoList": [{"employeeNo": str(employee_no)}],
+            }
+        }
+        body = await self.request(
+            "POST",
+            "AccessControl/UserInfo/Search?format=json",
+            data=_json(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        users = body.get("UserInfoSearch", {}).get("UserInfo") or []
+        if isinstance(users, dict):
+            users = [users]
+        if users:
+            return users[0]
+
+        position = 0
+        while True:
+            page_body = await self.get_users(position=position, max_results=100)
+            info = page_body.get("UserInfoSearch", {})
+            page = info.get("UserInfo") or []
+            if isinstance(page, dict):
+                page = [page]
+            for person in page:
+                if str(person.get("employeeNo")) == str(employee_no):
+                    return person
+            if info.get("responseStatusStrg") != "MORE" or not page:
+                return None
+            position += len(page)
+
+    async def get_person_count(self) -> int:
+        """Return the number of persons enrolled on the device."""
+
+        body = await self.request("GET", "AccessControl/UserInfo/Count?format=json")
+        try:
+            return int(body.get("UserInfoCount", {}).get("userNumber", 0))
+        except (TypeError, ValueError):  # pragma: no cover - defensive against odd firmware
+            return 0
+
+    async def set_card(self, employee_no: str, card_no: str) -> dict[str, Any]:
+        """Attach a card number to a person."""
+
+        payload = {"CardInfo": {"employeeNo": str(employee_no), "cardNo": str(card_no), "cardType": "normalCard"}}
         return await self.request(
             "PUT",
-            "AccessControl/UserInfo/Record?format=json",
-            data=_json({"UserInfo": user_info}),
+            "AccessControl/CardInfo/Record?format=json",
+            data=_json(payload),
+            headers={"Content-Type": "application/json"},
+        )
+
+    async def delete_card(self, card_no: str) -> dict[str, Any]:
+        """Remove a card by its number."""
+
+        payload = {"CardInfoDelCond": {"CardNoList": [{"cardNo": str(card_no)}]}}
+        return await self.request(
+            "PUT",
+            "AccessControl/CardInfo/Delete?format=json",
+            data=_json(payload),
             headers={"Content-Type": "application/json"},
         )
 
