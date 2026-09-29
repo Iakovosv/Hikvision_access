@@ -115,7 +115,9 @@ async def test_setup_follows_the_door_count_of_the_device(
 ) -> None:
     """The terminal reports how many doors it has, and one button is added per door."""
 
-    entry, _ = await _setup(hass, monkeypatch, [ACCESS_EVENT], door_count=4)
+    entry, _ = await _setup(
+        hass, monkeypatch, [ACCESS_EVENT], door_count=4, users=[{"employeeNo": "1001", "name": "Maria"}]
+    )
     await hass.async_block_till_done()
 
     door_buttons = {
@@ -129,6 +131,19 @@ async def test_setup_follows_the_door_count_of_the_device(
         "button.front_door_open_door_3",
         "button.front_door_open_door_4",
     }
+
+    refresh = [
+        state for state in hass.states.async_all("button") if "refresh_people" in state.entity_id
+    ]
+    assert len(refresh) == 1
+
+    enrolled = [
+        state
+        for state in hass.states.async_all("sensor")
+        if "persons_enrolled" in state.entity_id
+    ]
+    assert len(enrolled) == 1
+    assert enrolled[0].state == "1"
 
 
 async def test_open_door_button_presses(hass: HomeAssistant, monkeypatch) -> None:
@@ -164,7 +179,12 @@ async def test_last_access_sensor_is_unknown_before_any_event(
 async def test_entities_survive_without_event_permission(hass: HomeAssistant, monkeypatch) -> None:
     """Denied events leave the door buttons usable and explain the sensor."""
 
-    entry, _ = await _setup(hass, monkeypatch, denied_paths={"AccessControl/AcsEvent"})
+    entry, _ = await _setup(
+        hass,
+        monkeypatch,
+        denied_paths={"AccessControl/AcsEvent"},
+        users=[{"employeeNo": "1001", "name": "Maria"}],
+    )
     await hass.async_block_till_done()
 
     assert hass.states.get("button.front_door_open_door_1") is not None
@@ -172,6 +192,11 @@ async def test_entities_survive_without_event_permission(hass: HomeAssistant, mo
     state = hass.states.get("sensor.front_door_last_access_time")
     assert state is not None
     assert "reason" in state.attributes
+
+    # The person count does not depend on the event permission.
+    enrolled = hass.states.get("sensor.front_door_persons_enrolled")
+    assert enrolled is not None
+    assert enrolled.state == "1"
 
 
 async def test_setup_registers_device_and_binary_sensor(hass: HomeAssistant, monkeypatch) -> None:

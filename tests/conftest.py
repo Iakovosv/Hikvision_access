@@ -153,6 +153,7 @@ def _user_page(request: httpx.Request, users: list[dict[str, Any]], page_size: i
     page, status = _page(users, _requested_position(request), page_size)
     return {
         "searchID": "hikvision-access",
+        "totalMatches": len(users),
         "numOfMatches": len(page),
         "responseStatusStrg": status,
         "UserInfo": page,

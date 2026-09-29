@@ -193,6 +193,28 @@ async def test_get_door_count_returns_none_when_unknown() -> None:
     assert await client.get_door_count() is None
 
 
+async def test_get_person_count_falls_back_to_search() -> None:
+    """Firmware without UserInfo/Count reports the total from the search."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "Authorization" not in request.headers:
+            return httpx.Response(
+                401,
+                headers={"WWW-Authenticate": 'Digest realm="DS-1", qop="auth", nonce="abc", opaque="xyz"'},
+            )
+        if request.url.path.endswith("AccessControl/UserInfo/Count"):
+            return httpx.Response(404, json={"statusCode": 4})
+        if request.url.path.endswith("AccessControl/UserInfo/Search"):
+            return httpx.Response(200, json={"UserInfoSearch": {"totalMatches": 7}})
+        return httpx.Response(404, json={"statusCode": 4})
+
+    session = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = HikvisionAccessClient(
+        host="http://192.0.2.10", username="admin", password="secret", session=session
+    )
+    assert await client.get_person_count() == 7
+
+
 def test_device_time_parsing() -> None:
     """The device clock is parsed as local time."""
 
