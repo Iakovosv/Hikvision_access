@@ -240,6 +240,32 @@ class HikvisionAccessClient:
         self._auth = None
         await self._detect_auth()
 
+    async def _write(
+        self,
+        methods: tuple[str, ...],
+        path: str,
+        data: str | None = None,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> Any:
+        """Send a write, trying each verb until the device accepts one.
+
+        Firmware disagrees on the verb for the same endpoint: the ISAPI guide documents
+        POST for `UserInfo/Record` while other builds accept PUT. A wrong verb is answered
+        with `400` and the unambiguous sub-status `methodNotAllowed`, so the alternate verb
+        is tried rather than surfacing a failure the user cannot act on.
+        """
+
+        for index, method in enumerate(methods):
+            try:
+                return await self.request(method, path, data=data, headers=headers)
+            except HikvisionAccessError as ex:
+                if index + 1 == len(methods) or not _is_method_not_allowed(ex):
+                    raise
+                _LOGGER.debug("Device rejected %s %s; retrying with %s", method, path, methods[index + 1])
+
+        raise HikvisionAccessError(f"No supported method for {path}")  # pragma: no cover
+
     async def get_device_info(self) -> dict[str, Any]:
         """Return DeviceInfo from the device."""
 
@@ -393,8 +419,8 @@ class HikvisionAccessClient:
             user_type=user_type,
         )
 
-        result = await self.request(
-            "PUT",
+        result = await self._write(
+            ("POST", "PUT"),
             "AccessControl/UserInfo/Record?format=json",
             data=_json({"UserInfo": user_info}),
             headers={"Content-Type": "application/json"},
@@ -432,8 +458,8 @@ class HikvisionAccessClient:
             gender=gender,
             user_type=user_type,
         )
-        return await self.request(
-            "PUT",
+        return await self._write(
+            ("PUT", "POST"),
             "AccessControl/UserInfo/Modify?format=json",
             data=_json({"UserInfo": user_info}),
             headers={"Content-Type": "application/json"},
@@ -547,8 +573,8 @@ class HikvisionAccessClient:
         """Attach a card number to a person."""
 
         payload = {"CardInfo": {"employeeNo": str(employee_no), "cardNo": str(card_no), "cardType": "normalCard"}}
-        return await self.request(
-            "PUT",
+        return await self._write(
+            ("POST", "PUT"),
             "AccessControl/CardInfo/Record?format=json",
             data=_json(payload),
             headers={"Content-Type": "application/json"},
@@ -558,8 +584,8 @@ class HikvisionAccessClient:
         """Remove a card by its number."""
 
         payload = {"CardInfoDelCond": {"CardNoList": [{"cardNo": str(card_no)}]}}
-        return await self.request(
-            "PUT",
+        return await self._write(
+            ("PUT", "POST"),
             "AccessControl/CardInfo/Delete?format=json",
             data=_json(payload),
             headers={"Content-Type": "application/json"},
@@ -569,8 +595,8 @@ class HikvisionAccessClient:
         """Delete a person by employee number."""
 
         payload = {"UserInfoDelCond": {"EmployeeNoList": [{"employeeNo": str(employee_no)}]}}
-        return await self.request(
-            "PUT",
+        return await self._write(
+            ("PUT", "POST"),
             "AccessControl/UserInfo/Delete?format=json",
             data=_json(payload),
             headers={"Content-Type": "application/json"},
@@ -677,6 +703,16 @@ def _device_error(response: httpx.Response) -> str:
     status = body.get("statusString") or body.get("statusCode") or "unknown"
     sub = body.get("subStatusCode")
     return f"{status} ({sub})" if sub else str(status)
+
+
+def _is_method_not_allowed(ex: Exception) -> bool:
+    """Whether a rejected request was refused because the verb was wrong.
+
+    The client raises a plain error carrying the device sub-status, so the marker is
+    matched in the message rather than needing a dedicated exception type.
+    """
+
+    return "methodNotAllowed" in str(ex)
 
 
 def _isapi_time(value: dt.datetime) -> str:
