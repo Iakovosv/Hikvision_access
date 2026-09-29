@@ -86,3 +86,7 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
   placeholders: Home Assistant shows the raw key (e.g. a bare `cannot_list`) when a
   translation is missing, and silently drops a localized string whose placeholders differ
   from the English one. `tests/test_translations.py` guards both, per language.
+- Never write `[%key:common::...%]` in this integration's translations. That syntax is expanded
+  by `script.translations` while Core is built; a custom component is loaded from disk as-is, so
+  the reference reaches the browser untouched and the UI shows it literally (this shipped for
+  the config-flow field labels in 0.6.1). Copy the English text in, or translate it.

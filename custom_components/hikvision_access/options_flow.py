@@ -108,7 +108,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             try:
                 body = await self._client.get_users(position=position, max_results=100)
             except HikvisionAccessError as ex:
-                _LOGGER.error("Could not read the persons from the device: %s", ex)
+                _LOGGER.warning("Could not read the persons from the device: %s", ex)
                 self._list_error = str(ex)
                 return None
             info = body.get("UserInfoSearch", {})
@@ -127,7 +127,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
         try:
             return await self._client.get_person(employee_no)
         except HikvisionAccessError as ex:
-            _LOGGER.error("Could not read person %s from the device: %s", employee_no, ex)
+            _LOGGER.warning("Could not read person %s from the device: %s", employee_no, ex)
             self._list_error = str(ex)
             return None
 
@@ -159,7 +159,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
                 await self._create(user_input)
             except HikvisionAccessForbiddenError as ex:
                 errors["base"] = "insufficient_permission"
-                _LOGGER.error("Could not create the person: %s", ex)
+                _LOGGER.warning("Could not create the person: %s", ex)
             except HikvisionAccessError as ex:
                 errors["base"] = "device_error"
                 _LOGGER.error("Could not create the person: %s", ex)
@@ -210,11 +210,14 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             try:
                 await self._modify(employee_no, user_input)
                 await self._sync_card(employee_no, person, user_input)
-            except HomeAssistantError as ex:
-                errors["base"] = str(ex)
+            except HikvisionAccessForbiddenError as ex:
+                errors["base"] = "insufficient_permission"
+                _LOGGER.warning("Could not update the person: %s", ex)
             except HikvisionAccessError as ex:
                 errors["base"] = "device_error"
                 _LOGGER.error("Could not update the person: %s", ex)
+            except HomeAssistantError as ex:
+                errors["base"] = str(ex)
             else:
                 return self.async_create_entry(title="", data={})
 
@@ -257,6 +260,13 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
                 return self.async_abort(reason="delete_cancelled")
             try:
                 await self._client.delete_person(employee_no)
+            except HikvisionAccessForbiddenError as ex:
+                _LOGGER.warning("Could not delete the person: %s", ex)
+                return self.async_show_form(
+                    step_id="delete_confirm",
+                    data_schema=self._confirm_schema(),
+                    errors={"base": "insufficient_permission"},
+                )
             except HikvisionAccessError as ex:
                 _LOGGER.error("Could not delete the person: %s", ex)
                 return self.async_show_form(

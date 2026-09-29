@@ -327,3 +327,21 @@ async def test_add_person_without_permission_names_the_permission(hass: HomeAssi
     )
     assert result["type"] == "form"
     assert result["errors"]["base"] == "insufficient_permission"
+
+
+async def test_edit_person_without_permission_names_the_permission(hass: HomeAssistant, monkeypatch) -> None:
+    """A refused update shows the permission error too, not the generic one.
+
+    Add already said which permission is missing; edit fell through to the generic
+    "the device refused" text, so the two steps disagreed about the same 401.
+    """
+
+    entry, _ = await _setup(
+        hass, monkeypatch, users=[PERSON], denied_paths={"AccessControl/UserInfo/Modify"}
+    )
+    flow = await _flow(hass, entry)
+    await flow.async_step_edit({"employee_no": "1001"})
+
+    result = await flow.async_step_edit_form({"name": "Maria"})
+    assert result["type"] == "form"
+    assert result["errors"]["base"] == "insufficient_permission"
