@@ -26,7 +26,7 @@ async def async_setup_entry(
 
     coordinator: HikvisionAccessCoordinator = entry.runtime_data
     async_add_entities(
-        OpenDoorButton(coordinator, door) for door in coordinator.door_numbers
+        [*(OpenDoorButton(coordinator, door) for door in coordinator.door_numbers), RefreshPeopleButton(coordinator)]
     )
 
 
@@ -50,3 +50,25 @@ class OpenDoorButton(HikvisionAccessEntity, ButtonEntity):
             await self.coordinator.client.open_door(self._door_no)
         except HikvisionAccessError as ex:
             raise HomeAssistantError(f"Could not open door {self._door_no}: {ex}") from ex
+
+
+class RefreshPeopleButton(HikvisionAccessEntity, ButtonEntity):
+    """Re-read the door and person details from the terminal.
+
+    Useful right after granting the account its permissions: the counts refresh without
+    a restart, and it can be called from an automation like any other button.
+    """
+
+    _attr_icon = "mdi:refresh"
+    _attr_translation_key = "refresh_people"
+
+    def __init__(self, coordinator: HikvisionAccessCoordinator) -> None:
+        """Initialize the button."""
+
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.serial_no}_refresh_people"
+
+    async def async_press(self) -> None:
+        """Ask the coordinator to probe the device again."""
+
+        await self.coordinator.async_refresh()

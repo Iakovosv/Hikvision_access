@@ -53,7 +53,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: HikvisionAccessConfigEnt
         raise ConfigEntryNotReady(f"Cannot connect to {entry.data[CONF_HOST]}: {ex}") from ex
 
     coordinator = HikvisionAccessCoordinator(hass, entry, client, device_info)
-    coordinator.door_numbers = await _detect_doors(client)
     await coordinator.async_refresh()
     if not coordinator.last_update_success:
         error = coordinator.last_client_error or coordinator.last_exception
@@ -89,15 +88,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: HikvisionAccessConfigEn
     """Unload a config entry."""
 
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-
-
-async def _detect_doors(client: HikvisionAccessClient) -> list[int]:
-    """Return the door numbers to expose, asking the device how many it has."""
-
-    count = await client.get_door_count()
-    if count is None:
-        return [1]
-    return list(range(1, count + 1))
 
 
 async def _warn_on_clock_drift(client: HikvisionAccessClient) -> None:

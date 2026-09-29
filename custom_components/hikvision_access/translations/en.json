@@ -115,11 +115,17 @@
     "button": {
       "open_door": {
         "name": "Open door {door}"
+      },
+      "refresh_people": {
+        "name": "Refresh people"
       }
     },
     "sensor": {
       "last_access": {
         "name": "Last access time"
+      },
+      "persons_enrolled": {
+        "name": "Persons enrolled"
       }
     }
   }

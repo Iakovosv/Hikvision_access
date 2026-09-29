@@ -116,9 +116,35 @@ class HikvisionAccessCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         #: Door numbers the terminal controls, filled on the first refresh. Defaults to a
         #: single door so a terminal that cannot be asked is never shown doors it lacks.
         self.door_numbers: list[int] = [1]
+        #: Number of persons enrolled, or None when the account cannot read the count.
+        self.persons_enrolled: int | None = None
+        self._device_probed = False
+
+    async def async_probe(self) -> None:
+        """Read the door count and the person count, tolerating a refusal of either."""
+
+        try:
+            count = await self.client.get_door_count()
+        except HikvisionAccessError as ex:
+            _LOGGER.debug("Could not read the door count from %s: %s", self.serial_no, ex)
+        else:
+            if count:
+                self.door_numbers = list(range(1, count + 1))
+
+        try:
+            self.persons_enrolled = await self.client.get_person_count()
+        except HikvisionAccessError as ex:
+            _LOGGER.debug("Could not read the person count from %s: %s", self.serial_no, ex)
+        self._device_probed = True
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch access events since the previous poll."""
+
+        # Ask the terminal about itself once, before touching events. Both calls are best
+        # effort and independent of the event permission, so a terminal whose account may
+        # not read events still reports its doors and its person count.
+        if not self._device_probed:
+            await self.async_probe()
 
         now = dt_util.utcnow()
         start = self._last_poll or (now - dt.timedelta(seconds=ACS_EVENT_INITIAL_LOOKBACK_SECONDS))

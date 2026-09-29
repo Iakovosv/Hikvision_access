@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.0
+
+- Added `sensor.persons_enrolled` — how many people are enrolled on the terminal. Read from
+  `AccessControl/UserInfo/Count`, falling back to the search total on older firmware. It does
+  not need the event permission, so it also appears on a terminal whose account may not read
+  access events. When the account cannot read the count, the sensor is empty with the reason
+  in its attributes.
+- Added `button.refresh_people` — re-reads the door count and the person count from the
+  terminal. Press it after granting the account its permissions instead of restarting. It can
+  also be called from an automation.
+- The door count and the person count are read once at setup, before the event poll, so a
+  device whose events are refused still reports them.
+- Diagnostics report `persons_enrolled`.
+
+Note on door open/closed: a real door status is not available over ISAPI unless the terminal
+has a wired magnetic contact, and even then it arrives as an alarm input. It is deliberately
+not exposed rather than guessed.
+
 ## 0.4.1
 
 - Fixed: the door buttons were a fixed pair. A one-door terminal showed a second door that

@@ -24,7 +24,7 @@ async def async_setup_entry(
     """Add the last-access sensor."""
 
     coordinator: HikvisionAccessCoordinator = entry.runtime_data
-    async_add_entities([LastAccessSensor(coordinator)])
+    async_add_entities([LastAccessSensor(coordinator), PersonsEnrolledSensor(coordinator)])
 
 
 class LastAccessSensor(HikvisionAccessEntity, CoordinatorEntity, SensorEntity):
@@ -64,3 +64,41 @@ class LastAccessSensor(HikvisionAccessEntity, CoordinatorEntity, SensorEntity):
             "door_no": event.door_no,
             "granted": event.minor == 75,
         }
+
+
+class PersonsEnrolledSensor(HikvisionAccessEntity, CoordinatorEntity, SensorEntity):
+    """Show how many people are enrolled on the terminal.
+
+    Read once at setup. The count is only a convenience: a device account without the
+    person permission answers 401 and the sensor shows nothing instead of failing.
+    """
+
+    _attr_icon = "mdi:account-multiple"
+    _attr_translation_key = "persons_enrolled"
+    _attr_native_unit_of_measurement = "persons"
+
+    def __init__(self, coordinator: HikvisionAccessCoordinator) -> None:
+        """Initialize the sensor."""
+
+        HikvisionAccessEntity.__init__(self, coordinator)
+        CoordinatorEntity.__init__(self, coordinator)
+        self._attr_unique_id = f"{coordinator.serial_no}_persons_enrolled"
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the number of enrolled persons, or nothing when it is unknown."""
+
+        return self.coordinator.persons_enrolled
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Say why the count is missing, when it is."""
+
+        if self.coordinator.persons_enrolled is None:
+            return {
+                "reason": (
+                    "The device account could not read the person count. It needs "
+                    "Remote: Parameters Settings."
+                )
+            }
+        return {}
