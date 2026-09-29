@@ -201,3 +201,35 @@ async def test_diagnostics_redact_credentials(hass: HomeAssistant, monkeypatch) 
     dumped = str(diagnostics["entry"])
     assert "secret" not in dumped
     assert "192.0.2.10" not in dumped
+
+
+async def test_diagnostics_probe_when_setup_failed(hass: HomeAssistant, monkeypatch) -> None:
+    """Diagnostics still run the endpoint probes when setup failed.
+
+    Setup failure is the case where the probe matters most: it is the only way to tell a
+    missing Log Search permission from a wrong password from the support report.
+    """
+
+    entry = await _setup_expecting_failure(
+        hass, monkeypatch, denied_paths={"AccessControl/AcsEvent"}
+    )
+
+    session = httpx.AsyncClient(
+        transport=httpx.MockTransport(make_handler([], [], denied_paths={"AccessControl/AcsEvent"}))
+    )
+    monkeypatch.setattr(
+        "custom_components.hikvision_access.diagnostics.get_async_client",
+        lambda *a, **k: session,
+    )
+
+    from custom_components.hikvision_access.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+
+    diagnostics = await async_get_config_entry_diagnostics(hass, entry)
+
+    assert diagnostics["probe"]["device_info"] == "ok"
+    assert "HikvisionAccessPermissionError" in diagnostics["probe"]["access_events"]
+    dumped = str(diagnostics["entry"])
+    assert "secret" not in dumped
+    assert "192.0.2.10" not in dumped
