@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.2
+
+- The setup dialog no longer shows `[%key:common::config_flow::data::host%]` next to its
+  fields. Those references are expanded by the translation build script while Home Assistant
+  Core is built; a custom integration is loaded from disk as it is, so the reference reached
+  the browser untouched and the UI rendered it literally. The fields, `cannot_connect`,
+  `invalid_auth` and the aborts now carry their own English and Greek text.
+- "Edit person" and "Delete person" now name the missing permission too. Only "Add person"
+  distinguished a 401 from a device failure, so the same refused request showed the generic
+  "the device refused" text in edit and delete. All three read `insufficient_permission`.
+- A device that refuses to read the person list no longer logs at ERROR. A missing permission
+  is an expected state the flow already explains in the UI, so it is reported at WARNING and
+  the log no longer suggests a fault.
+- `tests/test_translations.py` no longer skips a value that contains `::`, which is exactly how
+  the literal `[%key:...%]` slipped through, and a new test fails the suite if any shipped
+  translation holds a build-time reference.
+
 ## 0.6.1
 
 - Fixed a raw `insufficient_permission` shown at the top of "Add person": the key was added to

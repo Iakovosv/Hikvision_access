@@ -64,9 +64,21 @@ def test_every_language_has_the_english_keys() -> None:
         assert set(localized) - set(english) == set(), f"{language} has unknown keys"
 
         for key, value in localized.items():
-            if "::" in value:  # a [%key:...%] reference to a core string, carried as-is
-                continue
             assert _placeholders(value) == _placeholders(english[key]), f"{language}.{key} placeholders differ"
+
+
+def test_no_translation_uses_a_build_time_reference() -> None:
+    """A custom integration never runs the translation build script.
+
+    `[%key:common::...%]` is resolved by `script.translations` while Home Assistant Core is
+    built. Custom components are loaded from disk as they are, so the reference reaches the
+    browser untouched and the UI renders it literally. This shipped for the config-flow field
+    labels: the setup dialog showed `[%key:common::config_flow::data::host%]` next to an input.
+    """
+
+    for path in (*TRANSLATIONS.glob("*.json"), COMPONENT / "strings.json"):
+        for key, value in _flatten(json.loads(path.read_text(encoding="utf-8"))).items():
+            assert "[%key:" not in value, f"{path.name}.{key} still holds a build-time reference"
 
 
 def test_strings_json_matches_english() -> None:

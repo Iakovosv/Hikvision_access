@@ -5,22 +5,22 @@
         "title": "Hikvision Access Control",
         "description": "Σύνδεση με τερματικό ελέγχου πρόσβασης Hikvision. Δημιουργήστε έναν χρήστη στη συσκευή με δικαιώματα Remote: Parameters Settings και Remote: Log Search.",
         "data": {
-          "host": "[%key:common::config_flow::data::host%]",
-          "username": "[%key:common::config_flow::data::username%]",
-          "password": "[%key:common::config_flow::data::password%]",
-          "verify_ssl": "[%key:common::config_flow::data::verify_ssl%]"
+          "host": "Host",
+          "username": "Όνομα χρήστη",
+          "password": "Κωδικός πρόσβασης",
+          "verify_ssl": "Επαλήθευση πιστοποιητικού SSL (αποεπιλέξτε για αυτο-υπογεγραμμένο)"
         }
       }
     },
     "error": {
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+      "cannot_connect": "Αποτυχία σύνδεσης",
+      "invalid_auth": "Μη έγκυρος έλεγχος ταυτότητας",
       "insufficient_permission": "Η συσκευή αρνήθηκε το αίτημα. Ελέγξτε τα δικαιώματα του χρήστη."
     },
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
-      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]",
-      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
+      "already_configured": "Η συσκευή έχει ήδη ρυθμιστεί",
+      "reauth_successful": "Η επανασύνδεση ήταν επιτυχής",
+      "reconfigure_successful": "Η επαναδιαμόρφωση ήταν επιτυχής"
     }
   },
   "options": {
