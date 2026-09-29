@@ -5,22 +5,22 @@
         "title": "Hikvision Access Control",
         "description": "Connect to a Hikvision access control terminal. Create a user on the device with Remote: Parameters Settings and Remote: Log Search permissions.",
         "data": {
-          "host": "[%key:common::config_flow::data::host%]",
-          "username": "[%key:common::config_flow::data::username%]",
-          "password": "[%key:common::config_flow::data::password%]",
-          "verify_ssl": "[%key:common::config_flow::data::verify_ssl%]"
+          "host": "Host",
+          "username": "Username",
+          "password": "Password",
+          "verify_ssl": "Verify SSL certificate (uncheck for self-signed certificate)"
         }
       }
     },
     "error": {
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
       "insufficient_permission": "The device refused the request. Check the user permissions."
     },
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
-      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]",
-      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
+      "already_configured": "Device is already configured",
+      "reauth_successful": "Re-authentication successful",
+      "reconfigure_successful": "Re-configuration successful"
     }
   },
   "options": {
