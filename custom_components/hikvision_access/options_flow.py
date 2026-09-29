@@ -33,6 +33,9 @@ from .const import (
     DOMAIN,
     GENDERS,
     USER_TYPES,
+    VISIT_TIMES_REMAINING_KEYS,
+    VISIT_TIMES_TOTAL_KEYS,
+    VISIT_TIMES_USED_KEYS,
 )
 from .isapi import HikvisionAccessError
 
@@ -120,7 +123,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
 
         return self.async_show_form(
             step_id="add",
-            data_schema=self._person_schema(),
+            data_schema=self._person_schema(include_card=True),
             errors=errors,
         )
 
@@ -389,12 +392,6 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
     def _visit_summary(person: dict[str, Any]) -> str:
         """Return the visitor visit counters when the device reports them."""
 
-        from .const import (
-            VISIT_TIMES_REMAINING_KEYS,
-            VISIT_TIMES_TOTAL_KEYS,
-            VISIT_TIMES_USED_KEYS,
-        )
-
         def _first(keys: tuple[str, ...]) -> Any:
             for key in keys:
                 if person.get(key) is not None:
@@ -408,7 +405,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             return "-"
         return f"remaining {remaining if remaining is not None else '?'} / used {used if used is not None else '?'} / total {total if total is not None else '?'}"
 
-    def _person_schema(self, defaults: dict[str, Any] | None = None) -> vol.Schema:
+    def _person_schema(self, defaults: dict[str, Any] | None = None, include_card: bool = False) -> vol.Schema:
         """Return the add/edit form schema, optionally prefilled from the device."""
 
         defaults = defaults or {}
@@ -438,11 +435,27 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
         schema[vol.Optional(ATTR_VALIDITY_ENABLED, default=validity_enabled)] = selector.BooleanSelector()
         schema[vol.Optional(ATTR_BEGIN_TIME)] = selector.DateTimeSelector()
         schema[vol.Optional(ATTR_END_TIME)] = selector.DateTimeSelector()
-        schema[vol.Optional(ATTR_CARD_NO)] = selector.TextSelector()
-        schema[vol.Optional(ATTR_DOOR_NO, default=1)] = selector.NumberSelector(
+        if include_card:
+            schema[vol.Optional(ATTR_CARD_NO)] = selector.TextSelector()
+        schema[vol.Optional(ATTR_DOOR_NO, default=self._door_default(defaults))] = selector.NumberSelector(
             selector.NumberSelectorConfig(min=1, max=4, mode=selector.NumberSelectorMode.BOX)
         )
         return vol.Schema(schema)
+
+    @staticmethod
+    def _door_default(person: dict[str, Any]) -> int:
+        """Return the first door the person is allowed to open, defaulting to 1."""
+
+        plans = person.get("RightPlan") or []
+        if isinstance(plans, dict):
+            plans = [plans]
+        for plan in plans:
+            if isinstance(plan, dict) and plan.get("doorNo") is not None:
+                try:
+                    return int(plan["doorNo"])
+                except (TypeError, ValueError):
+                    return 1
+        return 1
 
     @staticmethod
     def _gender_selector() -> selector.SelectSelector:

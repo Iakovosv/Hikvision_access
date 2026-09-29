@@ -196,3 +196,43 @@ async def test_methods_on_isapi_client(hass: HomeAssistant, monkeypatch) -> None
     await client.delete_card("55512345")
     delete = [r for r in captured if r.url.path.endswith("CardInfo/Delete")][-1]
     assert _body(delete)["CardInfoDelCond"]["CardNoList"] == [{"cardNo": "55512345"}]
+
+
+async def test_get_person_falls_back_to_full_scan(hass: HomeAssistant, monkeypatch) -> None:
+    """A device that ignores the employee filter is still searched by number."""
+
+    entry, _ = await _setup(hass, monkeypatch, users=[PERSON])
+    client = entry.runtime_data.client
+
+    original = client.request
+    calls = {"n": 0}
+
+    async def request(method, path, **kwargs):
+        if "UserInfo/Search" in path:
+            calls["n"] += 1
+            data = kwargs.get("data") or "{}"
+            if "EmployeeNoList" in data:
+                # Mimic firmware that ignores the employee filter: answer empty.
+                return {"UserInfoSearch": {"responseStatusStrg": "OK", "UserInfo": []}}
+        return await original(method, path, **kwargs)
+
+    monkeypatch.setattr(client, "request", request)
+    person = await client.get_person("1001")
+    assert calls["n"] >= 2
+    assert person is not None
+    assert person["employeeNo"] == "1001"
+
+
+async def test_edit_form_prefills_door_from_person(hass: HomeAssistant, monkeypatch) -> None:
+    """The door field defaults to the door the person already has rights to."""
+
+    entry, _ = await _setup(
+        hass, monkeypatch, users=[{**PERSON, "RightPlan": [{"doorNo": 3, "planTemplateNo": "1"}]}]
+    )
+    flow = await _flow(hass, entry)
+    await flow.async_step_edit({"employee_no": "1001"})
+    form = await flow.async_step_edit_form()
+
+    schema = form["data_schema"].schema
+    door_key = next(k for k in schema if getattr(k, "schema", k) == "door_no")
+    assert door_key.default() == 3

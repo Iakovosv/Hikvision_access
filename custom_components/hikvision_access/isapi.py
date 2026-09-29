@@ -392,7 +392,11 @@ class HikvisionAccessClient:
         return user_info
 
     async def get_person(self, employee_no: str) -> dict[str, Any] | None:
-        """Return one person by employee number, or None when the device has no match."""
+        """Return one person by employee number, or None when the device has no match.
+
+        The EmployeeNoList filter is not honoured by every firmware, so a miss falls back
+        to paging the enrolment list rather than reporting the person as gone.
+        """
 
         payload = {
             "UserInfoSearchCond": {
@@ -411,7 +415,22 @@ class HikvisionAccessClient:
         users = body.get("UserInfoSearch", {}).get("UserInfo") or []
         if isinstance(users, dict):
             users = [users]
-        return users[0] if users else None
+        if users:
+            return users[0]
+
+        position = 0
+        while True:
+            page_body = await self.get_users(position=position, max_results=100)
+            info = page_body.get("UserInfoSearch", {})
+            page = info.get("UserInfo") or []
+            if isinstance(page, dict):
+                page = [page]
+            for person in page:
+                if str(person.get("employeeNo")) == str(employee_no):
+                    return person
+            if info.get("responseStatusStrg") != "MORE" or not page:
+                return None
+            position += len(page)
 
     async def get_person_count(self) -> int:
         """Return the number of persons enrolled on the device."""
