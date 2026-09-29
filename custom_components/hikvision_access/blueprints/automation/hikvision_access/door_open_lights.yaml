@@ -1,0 +1,81 @@
+blueprint:
+  name: Hikvision - turn on lights when the door opens
+  description: >-
+    Turn on one or more lights when the Hikvision access control terminal reports an
+    access, and turn them off after a delay. Optionally restrict the automation to one
+    person. Enable or disable the automation whenever you want; nothing runs until you
+    create it.
+  domain: automation
+  author: Iakovosv
+  source_url: https://github.com/Iakovosv/Hikvision_access
+  input:
+    access_event:
+      name: Access event
+      description: The Hikvision access event. Leave this as it is.
+      default: hikvision_access_event
+      selector:
+        text:
+    person:
+      name: Person
+      description: >-
+        Only react to this person. Leave empty to react to anyone the terminal
+        recognises, named or not.
+      default: ""
+      selector:
+        text:
+    lights:
+      name: Lights
+      description: The lights to switch on.
+      selector:
+        target:
+          entity:
+            domain: light
+    brightness:
+      name: Brightness
+      description: Brightness percentage to switch the lights on to.
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+    hold:
+      name: Keep on for
+      description: How long to leave the lights on.
+      default: 300
+      selector:
+        number:
+          min: 0
+          max: 3600
+          unit_of_measurement: seconds
+
+mode: restart
+max_exceeded: silent
+
+triggers:
+  - trigger: event
+    event_type: !input access_event
+    event_data:
+      granted: true
+
+variables:
+  person_input: !input person
+  event_name: "{{ trigger.event.data.name or trigger.event.data.employee_no or '' }}"
+
+conditions:
+  - condition: template
+    value_template: >-
+      {{ (person_input | trim) == ""
+         or (event_name | trim | lower) == (person_input | trim | lower) }}
+
+actions:
+  - alias: Turn on the lights
+    action: light.turn_on
+    target: !input lights
+    data:
+      brightness_pct: !input brightness
+  - alias: Keep the lights on
+    delay: !input hold
+  - alias: Turn off the lights
+    action: light.turn_off
+    target: !input lights

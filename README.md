@@ -147,6 +147,40 @@ automation:
           message: "PIN {{ trigger.event.data.pin }} valid until {{ trigger.event.data.end_time }}"
 ```
 
+## Notifications, spoken announcements and lights
+
+All of this is optional and off until you turn it on. Open `Configure` and choose
+`Notifications & announcements`.
+
+- **Phone notification.** Turn on `Enable notifications`, pick the notify service of the
+  device you want to reach (your phone, Telegram, e-mail), and set the title and message.
+  `Notify me for every entry` reports everyone; leave it off and list names under
+  `Names to watch` to be told only about them, with their own title and message. Turn on
+  `Also notify when access is refused` to hear about a failed authentication too.
+- **Spoken announcement.** Turn on `Enable announcements`, pick a text-to-speech engine and
+  the speaker (a Google Nest, for example), and type what it should say. The announcement is
+  static text: it is the same every time for one entry, unlike the notification, which can
+  name the person.
+
+The messages take placeholders, filled from the event: `{name}`, `{employee_no}`,
+`{card_no}`, `{door}`, `{method}`, `{time}`, `{date}` and `{device}`. The default message is
+`{name} opened the door ({method}, door {door}) at {time}`; the default announcement is
+`Welcome {name}`. A placeholder that is not in the list is left as it is, so a stray brace
+cannot break the flow.
+
+```yaml
+# Example settings
+notify_title: "Front door"
+notify_message: "{name} came in with {method} at {time}"
+tts_message: "Καλώς ήρθες {name}"
+```
+
+To switch a light on when the door opens, the integration installs the blueprint
+`Hikvision - turn on lights when the door opens` into your configuration on first setup, so it
+appears under `Settings / Automations & Scenes / Blueprints`. Pick the lights, the brightness
+and how long to keep them on, and optionally restrict it to one person. You can equally write
+the automation yourself on the `hikvision_access_event` event.
+
 ## Why a separate integration
 
 The official `hikvision_next` integration groups NVRs and IP cameras. An access terminal is a
