@@ -31,7 +31,8 @@
           "add": "Add person",
           "edit": "Edit person",
           "delete": "Delete person",
-          "open_door": "Open door"
+          "open_door": "Open door",
+          "notifications": "Notifications & announcements"
         }
       },
       "add": {
@@ -92,6 +93,26 @@
         "description": "Unlock a door once.",
         "data": {
           "door_no": "Door"
+        }
+      },
+      "notifications": {
+        "title": "Notifications & announcements",
+        "description": "Optional. Nothing is sent until you turn it on here.\n\nPlaceholders you can use in the messages: {placeholders}\n\nSend a notification: turn on \"Enable notifications\", pick the notify service of the device you want to reach (your phone, Telegram, e-mail), and choose whether every entry is reported or only certain names. A name listed under \"Names to watch\" gets its own title and message.\n\nSpeak it aloud: turn on \"Enable announcements\", pick a text-to-speech engine and the speaker (a Google Nest, for example), and type what it should say.",
+        "data": {
+          "notify_enabled": "Enable notifications",
+          "notify_service": "Notify service (your phone, Telegram, e-mail)",
+          "notify_title": "Notification title",
+          "notify_message": "Notification message",
+          "notify_all": "Notify me for every entry",
+          "notify_names": "Names to watch (comma separated)",
+          "notify_named_title": "Watched-name title",
+          "notify_named_message": "Watched-name message",
+          "notify_denied": "Also notify when access is refused",
+          "tts_enabled": "Enable announcements",
+          "tts_all": "Announce every entry",
+          "tts_entity": "Text-to-speech engine",
+          "tts_media_player": "Speaker",
+          "tts_message": "Announcement text"
         }
       }
     },

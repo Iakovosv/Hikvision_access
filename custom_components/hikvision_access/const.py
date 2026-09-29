@@ -75,3 +75,38 @@ EVENT_VISITOR_CREATED: Final = f"{DOMAIN}_visitor_created"
 
 # Fired for every granted authentication, with the person details.
 EVENT_TYPE_ACCESS: Final = f"{DOMAIN}_event"
+
+# Options for the optional notification and announcements. They are stored on the config
+# entry, are all off by default, and only a user who opens the settings page turns them on.
+CONF_NOTIFY_ENABLED: Final = "notify_enabled"
+CONF_NOTIFY_SERVICE: Final = "notify_service"
+CONF_NOTIFY_TITLE: Final = "notify_title"
+CONF_NOTIFY_MESSAGE: Final = "notify_message"
+CONF_NOTIFY_ALL: Final = "notify_all"
+CONF_NOTIFY_NAMES: Final = "notify_names"
+CONF_NOTIFY_NAMED_TITLE: Final = "notify_named_title"
+CONF_NOTIFY_NAMED_MESSAGE: Final = "notify_named_message"
+CONF_NOTIFY_DENIED: Final = "notify_denied"
+CONF_TTS_ENABLED: Final = "tts_enabled"
+CONF_TTS_ALL: Final = "tts_all"
+CONF_TTS_ENTITY: Final = "tts_entity"
+CONF_TTS_MEDIA_PLAYER: Final = "tts_media_player"
+CONF_TTS_MESSAGE: Final = "tts_message"
+
+DEFAULT_NOTIFY_TITLE: Final = "Hikvision"
+DEFAULT_NOTIFY_MESSAGE: Final = "{name} opened the door ({method}, door {door}) at {time}"
+DEFAULT_NOTIFY_NAMED_TITLE: Final = "Hikvision"
+DEFAULT_NOTIFY_NAMED_MESSAGE: Final = "{name} opened the door at {time}"
+DEFAULT_TTS_MESSAGE: Final = "Welcome {name}"
+
+# Placeholders a message template may use, offered in the settings form.
+NOTIFICATION_PLACEHOLDERS: Final = (
+    "name",
+    "employee_no",
+    "card_no",
+    "door",
+    "method",
+    "time",
+    "date",
+    "device",
+)

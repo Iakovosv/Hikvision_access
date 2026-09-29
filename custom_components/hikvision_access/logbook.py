@@ -17,6 +17,7 @@ from homeassistant.components.logbook import (
 from homeassistant.core import HomeAssistant, callback
 
 from .const import DOMAIN, EVENT_TYPE_ACCESS
+from .methods import method_label
 
 _MISSING = "?"
 
@@ -30,35 +31,6 @@ _LINES: dict[str, dict[str, str]] = {
         "granted": "Ο/Η {name} άνοιξε την πόρτα ({method}, πόρτα {door})",
         "granted_with_card": "Ο/Η {name} άνοιξε την πόρτα με κάρτα {card} (πόρτα {door})",
         "denied": "Απορρίφθηκε η πρόσβαση για {name} (πόρτα {door})",
-    },
-}
-
-_METHODS: dict[str, dict[str, str]] = {
-    "en": {
-        "access": "access",
-        "card": "card",
-        "fp": "fingerprint",
-        "cardAndPw": "card + PIN",
-        "fpAndPw": "fingerprint + PIN",
-        "fpOrCard": "fingerprint or card",
-        "fpAndCard": "fingerprint + card",
-        "fpAndCardAndPw": "fingerprint + card + PIN",
-        "fpOrPw": "fingerprint or PIN",
-        "cardOrPw": "card or PIN",
-        "cardOrFpOrPw": "card, fingerprint or PIN",
-    },
-    "el": {
-        "access": "πρόσβαση",
-        "card": "κάρτα",
-        "fp": "δακτυλικό αποτύπωμα",
-        "cardAndPw": "κάρτα + PIN",
-        "fpAndPw": "δακτυλικό + PIN",
-        "fpOrCard": "δακτυλικό ή κάρτα",
-        "fpAndCard": "δακτυλικό + κάρτα",
-        "fpAndCardAndPw": "δακτυλικό + κάρτα + PIN",
-        "fpOrPw": "δακτυλικό ή PIN",
-        "cardOrPw": "κάρτα ή PIN",
-        "cardOrFpOrPw": "κάρτα, δακτυλικό ή PIN",
     },
 }
 
@@ -82,7 +54,6 @@ def async_describe_events(
 
     language = hass.config.language if hass.config.language in _LINES else "en"
     lines = _LINES[language]
-    methods = _METHODS[language]
 
     @callback
     def async_describe_access(event: LazyEventPartialState) -> dict[str, str]:
@@ -90,7 +61,7 @@ def async_describe_events(
 
         data = event.data
         name = data.get("name") or data.get("employee_no") or _MISSING
-        method = methods.get(data.get("method") or "access", data.get("method") or "access")
+        method = method_label(language, data.get("method"))
         card = data.get("card_no")
         door = data.get("door_no")
 

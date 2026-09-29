@@ -43,7 +43,7 @@ async def test_menu_is_shown(hass: HomeAssistant, monkeypatch) -> None:
 
     result = await flow.async_step_init()
     assert result["type"] == "menu"
-    assert set(result["menu_options"]) == {"add", "edit", "delete", "open_door"}
+    assert set(result["menu_options"]) == {"add", "edit", "delete", "open_door", "notifications"}
 
 
 async def test_add_person_sends_all_fields(hass: HomeAssistant, monkeypatch) -> None:
@@ -383,3 +383,65 @@ async def test_edit_person_without_permission_names_the_permission(hass: HomeAss
     result = await flow.async_step_edit_form({"name": "Maria"})
     assert result["type"] == "form"
     assert result["errors"]["base"] == "insufficient_permission"
+
+
+NOTIFY_OPTIONS = {
+    "notify_enabled": True,
+    "notify_service": "notify.mobile_app_me",
+    "notify_title": "Door",
+    "notify_message": "{name} came in",
+    "notify_all": True,
+    "notify_names": "Maria",
+    "notify_named_title": "Watched",
+    "notify_named_message": "{name} is here",
+    "notify_denied": True,
+    "tts_enabled": True,
+    "tts_all": True,
+    "tts_entity": "tts.google_translate_el",
+    "tts_media_player": "media_player.nest",
+    "tts_message": "Καλώς ήρθες {name}",
+}
+
+
+async def test_notifications_step_shows_every_setting(hass: HomeAssistant, monkeypatch) -> None:
+    """The notifications page offers both the phone alert and the spoken announcement."""
+
+    entry, _ = await _setup(hass, monkeypatch)
+    flow = await _flow(hass, entry)
+
+    result = await flow.async_step_notifications()
+    assert result["type"] == "form"
+    keys = {key.schema for key in result["data_schema"].schema}
+    assert keys == set(NOTIFY_OPTIONS)
+
+
+async def test_notifications_step_saves_the_settings(hass: HomeAssistant, monkeypatch) -> None:
+    """Submitting the page writes the options."""
+
+    entry, _ = await _setup(hass, monkeypatch)
+    flow = await _flow(hass, entry)
+
+    result = await flow.async_step_notifications(
+        {"notify_enabled": True, "notify_service": "notify.mobile_app_me", "notify_all": True}
+    )
+    assert result["type"] == "create_entry"
+    assert result["data"]["notify_enabled"] is True
+    assert result["data"]["notify_service"] == "notify.mobile_app_me"
+    assert result["data"]["notify_all"] is True
+
+
+async def test_person_action_keeps_the_notification_settings(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """Deleting a person must not wipe the notification options."""
+
+    entry, _ = await _setup(hass, monkeypatch)
+    hass.config_entries.async_update_entry(entry, options=dict(NOTIFY_OPTIONS))
+    flow = await _flow(hass, entry)
+
+    await flow.async_step_delete({"employee_no": "1001"})
+    result = await flow.async_step_delete_confirm({"confirm": True})
+    assert result["type"] == "create_entry"
+    for key, value in NOTIFY_OPTIONS.items():
+        assert result["data"][key] == value
+

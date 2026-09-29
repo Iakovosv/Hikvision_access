@@ -14,6 +14,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.util import dt as dt_util
 
+from .blueprints import async_install_blueprint
 from .const import CLOCK_DRIFT_WARNING_SECONDS, DOMAIN
 from .coordinator import HikvisionAccessCoordinator
 from .isapi import (
@@ -21,6 +22,7 @@ from .isapi import (
     HikvisionAccessClient,
     HikvisionAccessError,
 )
+from .notifications import async_setup_notifications
 from .services import async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -81,7 +83,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: HikvisionAccessConfigEnt
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await async_setup_services(hass)
+    async_setup_notifications(hass, entry)
+    await async_install_blueprint(hass)
+    # Turning notifications on or off changes the listener, so reload the entry. The
+    # person-management steps write no options, so they do not trigger a reload.
+    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     return True
+
+
+async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the entry so the notification settings take effect."""
+
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: HikvisionAccessConfigEntry) -> bool:
