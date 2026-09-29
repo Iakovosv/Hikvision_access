@@ -37,6 +37,12 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
 - A 401 on `AccessControl/AcsEvent` after a successful `System/deviceInfo` means the
   device account lacks `Remote: Log Search / Interrogate Working Status`. It is not a
   password problem. Also enable `Remote: Parameters Settings`.
+- A missing event permission must never fail setup. Only the last-access sensor needs
+  access events; person management, the services, diagnostics and the door control do
+  not. `coordinator.event_access_denied` carries the state, the poll degrades to
+  `POLL_INTERVAL_DEGRADED_SECONDS`, the sensor goes unavailable with a reason, and the
+  permission is re-checked on every poll so it recovers without a restart. Never raise
+  `ConfigEntryError` for this: it hides the whole UI behind one permission.
 - `Calling Services` / NULL value: HA calls a service with an empty `{}` when a handler
   edits and resubmits without touching the PIN field — treat empty PIN as "keep".
 - The reference firmware does not report visitor visit counters over ISAPI. Read them by
