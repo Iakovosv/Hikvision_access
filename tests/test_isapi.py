@@ -250,6 +250,49 @@ async def test_missing_permission_is_not_an_auth_failure() -> None:
         )
 
 
+async def test_spent_digest_nonce_is_renegotiated() -> None:
+    """A 401 from a reused nonce is retried with a fresh challenge, not read as permission.
+
+    The terminal accepts each digest nonce once. httpx reuses the cached challenge, so
+    the second and later requests carry a spent nonce and the device refuses without
+    advertising a new one. That refusal is not a missing permission and must not be
+    reported as one, or person management looks broken on a correctly configured device.
+    """
+
+    used: set[str] = set()
+    counter = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "Authorization" not in request.headers:
+            counter["n"] += 1
+            nonce = f"nonce{counter['n']}"
+            return httpx.Response(
+                401, headers={"WWW-Authenticate": f'Digest realm="DS-1", qop="auth", nonce="{nonce}"'}
+            )
+        nonce = request.headers["Authorization"].split("nonce=")[1].split('"')[1]
+        if nonce in used:
+            # The device spends the nonce; the retry after re-negotiation must succeed.
+            return httpx.Response(401, json={"statusCode": 4, "subStatusCode": "invalidOperation"})
+        used.add(nonce)
+        return httpx.Response(200, json={"UserInfoSearch": {"totalMatches": 4, "UserInfo": []}})
+
+    # Setup proves the credentials with a first deviceInfo call.
+    def info_handler(request: httpx.Request) -> httpx.Response:
+        response = handler(request)
+        if response.status_code == 200 and "deviceInfo" in request.url.path:
+            return httpx.Response(200, json={"DeviceInfo": {"model": "DS-K1T805MBFWX"}})
+        return response
+
+    session = httpx.AsyncClient(transport=httpx.MockTransport(info_handler))
+    client = HikvisionAccessClient(HOST, "admin", "secret", session=session)
+    await client.get_device_info()
+
+    first = await client.get_users()
+    second = await client.get_users()
+    assert first["UserInfoSearch"]["totalMatches"] == 4
+    assert second["UserInfoSearch"]["totalMatches"] == 4
+
+
 @pytest.mark.parametrize(
     ("endpoint", "expected"),
     [

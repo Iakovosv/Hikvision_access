@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.3
+
+- **Fixed person management failing on a correctly configured device.** The terminal accepts
+  each HTTP Digest nonce only once, but httpx caches the challenge from the first
+  `System/deviceInfo` call and reuses it. Every later request therefore carried a spent nonce,
+  the device refused it with a bare 401 and — unlike a browser-friendly server — advertised no
+  fresh `WWW-Authenticate`, so httpx could not recover. The client now re-negotiates the
+  challenge and retries the request once before deciding anything. This is the real cause of
+  "the device refused … enable Remote: Parameters Settings" on add, edit and delete person
+  even with the `admin` account; it was not a permission problem. Verified against the device
+  with `curl --digest`, which returned the person list with the same credentials.
+- The retry only runs after the credentials are known good (`_auth_verified`), so a wrong
+  password still costs one login and cannot drive the account into a lockout.
+- Added `tests/test_isapi.py::test_spent_digest_nonce_is_renegotiated`, which reproduces a
+  device that spends each nonce and refuses the reuse without a fresh challenge.
+
 ## 0.6.2
 
 - The setup dialog no longer shows `[%key:common::config_flow::data::host%]` next to its
