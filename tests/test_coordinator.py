@@ -15,13 +15,24 @@ HOST = "http://192.0.2.10"
 
 ACCESS_EVENT = {
     "major": 5,
-    "minor": 75,
+    "minor": 1,
     "time": "2026-09-28T09:15:00+03:00",
     "name": "Maria",
     "employeeNoString": "900001",
-    "cardNo": "",
+    "cardNo": "2673003718",
     "doorNo": 1,
+    "currentVerifyMode": "cardOrFpOrPw",
     "eventId": "evt-1",
+}
+
+# The door-state pair the device reports alongside a real authentication: it carries no
+# person, employee number or card, so it must never be taken for an access.
+DOOR_EVENT = {
+    "major": 5,
+    "minor": 21,
+    "time": "2026-09-28T09:15:00+03:00",
+    "doorNo": 1,
+    "eventId": "evt-door",
 }
 
 
@@ -43,11 +54,29 @@ async def test_access_event_is_parsed_and_fired(hass) -> None:
     assert coordinator.last_event is not None
     assert coordinator.last_event.name == "Maria"
     assert coordinator.last_event.employee_no == "900001"
+    assert coordinator.last_event.card_no == "2673003718"
+    assert coordinator.last_event.method == "cardOrFpOrPw"
+    assert coordinator.last_event.granted is True
     assert coordinator.last_event.door_no == 1
     assert coordinator.is_entry_granted is True
     assert len(received) == 1
     assert received[0].data["employee_no"] == "900001"
+    assert received[0].data["method"] == "cardOrFpOrPw"
+    assert received[0].data["granted"] is True
     assert received[0].data["device_id"] == "DSK1T805TEST0001"
+
+
+async def test_door_state_events_are_ignored(hass) -> None:
+    """The open/close pair the device reports carries no identity and is not an access."""
+
+    coordinator = _coordinator(hass, [DOOR_EVENT])
+    received = []
+    hass.bus.async_listen(EVENT_TYPE_ACCESS, lambda event: received.append(event))
+
+    await coordinator.async_refresh()
+
+    assert coordinator.last_event is None
+    assert received == []
 
 
 async def test_duplicate_events_fire_once(hass) -> None:
