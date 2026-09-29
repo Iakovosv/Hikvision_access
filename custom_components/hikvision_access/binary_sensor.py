@@ -74,5 +74,6 @@ class LastAccessSensor(HikvisionAccessEntity, CoordinatorEntity, BinarySensorEnt
             "employee_no": event.employee_no,
             "card_no": event.card_no,
             "door_no": event.door_no,
+            "method": event.method,
             "time": event.time.isoformat(),
         }

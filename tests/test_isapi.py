@@ -47,7 +47,7 @@ async def test_get_access_events_payload(session: httpx.AsyncClient) -> None:
     request = captured[-1]
     body = decoder(request)["AcsEventCond"]
     assert body["major"] == 5
-    assert body["minor"] == 75
+    assert body["minor"] == 0
     assert body["startTime"] == "2026-01-01T10:00:00"
     assert body["endTime"] == "2026-01-01T10:05:00"
     assert request.headers["Content-Type"] == "application/json"

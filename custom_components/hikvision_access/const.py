@@ -4,16 +4,24 @@ from typing import Final
 
 DOMAIN: Final = "hikvision_access"
 
-# Access event major type and the minor type for a successful authentication.
+# Access event major type. Minor 0 asks the device for every minor type; the reference
+# firmware rejects a query without a minor, and reports a card read as minor 1, so the
+# selection is done on the event's identity instead of on a per-method code.
 ACS_EVENT_MAJOR: Final = 5
-ACS_EVENT_MINOR_SUCCESS: Final = 75
+
+# Minor codes documented for a granted authentication. Firmware disagrees on these (the
+# reference terminal uses 1 for a card), so an event carrying a card number also counts
+# as granted regardless of its minor.
+ACS_EVENT_SUCCESS_MINORS: Final = (1, 38, 75, 113)
 
 # The device reports a photo per access event only when this URL is requested.
 ACS_EVENT_PIC_URL_PREFIX: Final = "/ISAPI/AccessControl/AcsEvent?"
 
-# How many access events to request per poll, and how far back the first poll looks.
+# How many access events to request per poll, and how far back the first poll looks. The
+# first lookback spans a day so an access while Home Assistant was down is not lost, and
+# an event from the visit window can be recalled after a restart.
 ACS_EVENT_PAGE_SIZE: Final = 30
-ACS_EVENT_INITIAL_LOOKBACK_SECONDS: Final = 3600
+ACS_EVENT_INITIAL_LOOKBACK_SECONDS: Final = 86400
 
 # Poll interval. The device does not push events over a plain HTTP connection.
 POLL_INTERVAL_SECONDS: Final = 30

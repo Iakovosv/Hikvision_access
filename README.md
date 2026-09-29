@@ -10,10 +10,14 @@ which covers NVRs and IP cameras. Install both if you have cameras and an access
 
 - Discover the terminal by host, username and password, over HTTP with digest or basic auth
 - A `binary_sensor.last_access` entity that turns on when someone authenticates, with
-  attributes for the name, employee number, card number, door and time
+  attributes for the name, employee number, card number, door, method and time
 - A `sensor.last_access_time` timestamp entity showing when someone last authenticated, with
-  the name, employee number, card number and door as attributes. This is the "who entered and
-  when" entity for a dashboard card.
+  the name, employee number, card number, door, method and `granted` as attributes. This is
+  the "who entered and when" entity for a dashboard card.
+- Every opening also appears in the **Activity** log of the device page, one line naming the
+  person and the door, e.g. *"House cleaner opened the door with card 2673003718 (door 1)"*.
+  The line follows the Home Assistant language. Card, fingerprint, face and PIN opens are all
+  reported; a query the terminal cannot answer for one method no longer hides the rest.
 - One `button.open_door_N` per door. The number of doors is read from the terminal, so a
   single-door model shows one button, not a fixed pair. A door can be unlocked from a
   dashboard or an automation, not only from the gear menu.
@@ -54,6 +58,15 @@ that exposes the same `AccessControl` ISAPI endpoints is expected to work, and o
 numbers the codes differently still shows its events in the debug log, which is enough to
 add support. When reporting a different model or firmware, include the model, the firmware
 build and a debug log.
+
+The event poll asks the terminal for **all** minor types of access event (`major=5, minor=0`)
+and then keeps the events that carry a name, an employee number or a card number. This is
+deliberate: firmware disagrees on the minor code for a successful authentication (the
+reference terminal reports a card read as `minor=1` where the ISAPI guide documents `38`,
+and never reports the documented face code `75`), and a query restricted to one method
+answers `NO MATCH` while other methods have events. Selecting on the event's identity instead
+of on a per-method code sees every card, fingerprint, face and PIN open on every firmware that
+follows the same ISAPI shape.
 
 ## Installation
 
@@ -197,4 +210,6 @@ logger:
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Not affiliated with Hikvision.
+Source-available, all rights reserved, see [LICENSE](LICENSE). Free to install and run for
+personal use, but copying, redistributing, modifying or using it commercially requires
+written permission from the author. Not affiliated with Hikvision.
