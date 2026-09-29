@@ -61,6 +61,10 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
   `Intelligent/FDLib/FaceDataRecord`; the target device has no camera, so it is skipped.
 - `UserInfo Search` with `EmployeeNoList` is ignored by some firmware; `get_person` falls
   back to a full paged scan.
+- Device probing (door count, person count) must run before the event poll and must not
+  depend on the event permission: a terminal whose account may read people but not events
+  still has to be described correctly. An entity that only needed the gear menu must gain a
+  matching entity; `refresh_people` exists so a permission change needs no restart.
 - The number of doors differs by model. Ask `AccessControl/Door/Count`, else walk
   `System/capabilities`, and expose only what is reported; some terminals are single door.
   A 404 on an endpoint is a normal "not supported", not an error to surface.
