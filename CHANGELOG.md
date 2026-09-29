@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.6
+
+- **The edit form now shows the PIN a person already has.** The terminal returns it as
+  `localPassword` in `UserInfo/Search` (some builds also echo `password`), but the form
+  always opened the PIN field blank, so a PIN set earlier could not be recalled. The field
+  is now prefilled from the device and the PIN is also shown in the summary line above the
+  form. Nothing is stored by the integration — it is read from the device each time.
+- When the device does not return the PIN (some firmware hides it), the field stays empty
+  and the summary shows `-`, exactly as before.
+- Added tests for both the prefilled and the hidden-PIN cases.
+
 ## 0.6.5
 
 - **Creating and editing a person now works on firmware that requires `POST`.** The device
