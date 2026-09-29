@@ -62,6 +62,22 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
   person count, add/edit/delete), `Remote: Log Search` covers `/AccessControl/AcsEvent`
   (the last-access sensor and binary sensor). A 401 on UserInfo is why "Edit person" and
   "Delete person" abort and "Add person" is refused while everything else works.
+- **Access events are not `minor=75`.** The ISAPI guide calls 75 "face authentication
+  success", but the reference terminal never reports it: it numbers a **card read as
+  `minor=1`** (with `name`, `employeeNoString`, `cardNo`, `currentVerifyMode`), and reports
+  the door open/close pair as `minor=21`/`22` with **no** identity. A `minor=75` query answers
+  `NO MATCH` while real events exist, which is why the last-access entities looked broken.
+  The poll therefore asks for `minor=0`, which this firmware supports and means "every minor
+  type", and `_build_event` keeps only the events carrying a name, an employee number or a
+  card. Do not narrow this back to a per-method code: firmware disagrees on them.
+  `AccessControl/AcsEvent/capabilities` lists the minors a device accepts, and the device
+  **rejects a query with no `minor` at all** (`MessageParametersLack`).
+- A successful access is shown in the device page's Activity log through `logbook.py`. It
+  reads its strings from `translations/*.json` under `logbook.*` (and `logbook.method.*` for
+  the verify mode), because the logbook has no entity translation to fall back on. The
+  `after_dependencies` in `manifest.json` names `logbook` so the platform is imported when
+  the logbook is loaded.
+- The reference firmware reports `maxResults` up to 30 on `AcsEvent`; ask for no more.
 - A missing event permission must never fail setup. Only the last-access sensor needs
   access events; person management, the services, diagnostics and the door control do
   not. `coordinator.event_access_denied` carries the state, the poll degrades to

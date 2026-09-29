@@ -11,6 +11,8 @@ from typing import Any, Final
 import httpx
 from homeassistant.util import dt as dt_util
 
+from .const import ACS_EVENT_MAJOR
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -327,12 +329,17 @@ class HikvisionAccessClient:
         end: dt.datetime,
         position: int = 0,
         max_results: int = 30,
+        minor: int = 0,
     ) -> dict[str, Any]:
         """Return access events in the given time window.
 
-        `major=5` selects access events, `minor=75` a successful authentication.
-        The device compares these timestamps against its own clock, so the values
-        are converted to this Home Assistant instance's local time.
+        `major=5` selects access events and `minor=0` asks for every minor type. The
+        device this integration targets rejects a query without a `minor`, and pins its
+        successful authentications to `minor=1`, not the documented `minor=75`, so asking
+        for everything and picking the entries that carry an identity is the only approach
+        that sees every card, fingerprint and face read. The device compares these
+        timestamps against its own clock, so the values are converted to this Home
+        Assistant instance's local time.
         """
 
         payload = {
@@ -340,8 +347,8 @@ class HikvisionAccessClient:
                 "searchID": "hikvision-access",
                 "searchResultPosition": position,
                 "maxResults": max_results,
-                "major": 5,
-                "minor": 75,
+                "major": ACS_EVENT_MAJOR,
+                "minor": minor,
                 "startTime": _isapi_time(start),
                 "endTime": _isapi_time(end),
             }

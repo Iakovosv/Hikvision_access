@@ -129,5 +129,23 @@
         "name": "Persons enrolled"
       }
     }
+  },
+  "logbook": {
+    "granted": "{name} opened the door ({method}, door {door})",
+    "granted_with_card": "{name} opened the door with card {card} (door {door})",
+    "denied": "Access denied for {name} (door {door})",
+    "method": {
+      "access": "access",
+      "card": "card",
+      "fp": "fingerprint",
+      "cardAndPw": "card + PIN",
+      "fpAndPw": "fingerprint + PIN",
+      "fpOrCard": "fingerprint or card",
+      "fpAndCard": "fingerprint + card",
+      "fpAndCardAndPw": "fingerprint + card + PIN",
+      "fpOrPw": "fingerprint or PIN",
+      "cardOrPw": "card or PIN",
+      "cardOrFpOrPw": "card, fingerprint or PIN"
+    }
   }
 }

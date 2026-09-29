@@ -62,7 +62,8 @@ class LastAccessSensor(HikvisionAccessEntity, CoordinatorEntity, SensorEntity):
             "employee_no": event.employee_no,
             "card_no": event.card_no,
             "door_no": event.door_no,
-            "granted": event.minor == 75,
+            "method": event.method,
+            "granted": event.granted,
         }
 
 
