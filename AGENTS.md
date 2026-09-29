@@ -24,9 +24,14 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
 - `coordinator.py` — polls `AcsEvent` and fires `hikvision_access_event`.
 - `config_flow.py` — setup, reconfigure, reauth. Exposes the options flow via
   `async_get_options_flow`.
-- `options_flow.py` — **person management UI** (Configure button). Menu: add, edit,
-  delete, cards, open_door. Talks to the device through the coordinator client; stores no
-  options on the entry.
+- `options_flow.py` — **person management UI** (Configure button). Menu: add, edit, delete,
+  open_door. Talks to the device through the coordinator client; stores no options on the
+  entry. Everything about a person, including the card, lives in the edit form. Every device
+  read is guarded: a 401 turns into an abort with a reason (`cannot_list`), never an
+  exception out of the flow, because an uncaught error shows the user a bare "unknown error".
+- `sensor.py` — `last_access_time`, the who-entered-and-when timestamp sensor.
+- `button.py` — `open_door_N` per door, so a door is reachable from a dashboard, not only the
+  gear menu. Any user-facing capability must have an entity; the gear menu is not the only UI.
 - `services.py` / `services.yaml` — YAML equivalents (`create_visitor`, `delete_user`,
   `open_door`).
 - `diagnostics.py` — redacted report; probes endpoints directly when setup failed (there
