@@ -213,6 +213,34 @@ class HikvisionAccessClient:
 
         return await self.request("GET", "System/capabilities")
 
+    async def get_door_count(self) -> int | None:
+        """Return how many doors the terminal controls, or None when it cannot be told.
+
+        Firmware differs: some answer `AccessControl/Door/Count`, others only carry the
+        number inside `System/capabilities`. Reporting None instead of a guess keeps the
+        caller from inventing doors a one-door terminal does not have.
+        """
+
+        try:
+            body = await self.request("GET", "AccessControl/Door/Count")
+        except HikvisionAccessError:
+            pass
+        else:
+            for key in ("DoorCount", "doorCount", "Door"):
+                value = body.get(key)
+                if isinstance(value, dict):
+                    value = value.get("doorNumber") or value.get("count")
+                count = _as_positive_int(value)
+                if count:
+                    return count
+
+        try:
+            capabilities = await self.get_capabilities()
+        except HikvisionAccessError:
+            return None
+        count = _find_door_count(capabilities)
+        return count
+
     async def get_access_events(
         self,
         start: dt.datetime,
@@ -488,6 +516,41 @@ class HikvisionAccessClient:
         """Return the URL of the snapshot attached to an access event."""
 
         return f"{self.host}/ISAPI/AccessControl/AcsEvent?format=json&picType=url&eventId={event_id}"
+
+
+def _as_positive_int(value: Any) -> int | None:
+    """Return value as a positive int, or None when it is not one."""
+
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return None
+    return count if count > 0 else None
+
+
+def _find_door_count(capabilities: Any) -> int | None:
+    """Look for a door count anywhere in the capabilities tree.
+
+    ISAPI nests capabilities differently between firmware versions, so the tree is walked
+    and any key that names a door number is read, rather than assuming one path.
+    """
+
+    if isinstance(capabilities, dict):
+        for key, value in capabilities.items():
+            if key.lower() in ("doornumber", "doorcount", "numberofdoors", "dooramount"):
+                count = _as_positive_int(value)
+                if count:
+                    return count
+        for value in capabilities.values():
+            count = _find_door_count(value)
+            if count:
+                return count
+    elif isinstance(capabilities, list):
+        for item in capabilities:
+            count = _find_door_count(item)
+            if count:
+                return count
+    return None
 
 
 def _json(payload: dict[str, Any]) -> str:
