@@ -26,6 +26,7 @@ from .const import (
     ATTR_EMPLOYEE_NO,
     ATTR_END_TIME,
     ATTR_GENDER,
+    ATTR_MAX_TIMES,
     ATTR_NAME,
     ATTR_PIN,
     ATTR_USER_TYPE,
@@ -78,6 +79,21 @@ def _door_number(value: Any, default: int = 1) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _max_times(value: Any) -> int | None:
+    """Return the usage limit, or None to leave the field off the request.
+
+    An empty field, a zero or anything unreadable means "no limit"; the device is only
+    told about a positive number, because firmware without the field refuses the write
+    when it is present and 0 means "no entry allowed" on firmware that has it.
+    """
+
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
 
 
 def _person_label(person: dict[str, Any]) -> str:
@@ -428,6 +444,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             gender=user_input.get(ATTR_GENDER),
             user_type=user_input.get(ATTR_USER_TYPE, "normal"),
             card_no=(user_input.get(ATTR_CARD_NO) or "").strip() or None,
+            max_times=_max_times(user_input.get(ATTR_MAX_TIMES)),
         )
 
     async def _modify(self, employee_no: str, user_input: dict[str, Any]) -> None:
@@ -443,6 +460,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             door_no=_door_number(user_input.get(ATTR_DOOR_NO)),
             gender=user_input.get(ATTR_GENDER),
             user_type=user_input.get(ATTR_USER_TYPE, "normal"),
+            max_times=_max_times(user_input.get(ATTR_MAX_TIMES)),
         )
 
     async def _sync_card(
@@ -569,8 +587,29 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
         )
         schema[vol.Optional(ATTR_VALIDITY_ENABLED, default=validity_enabled)] = selector.BooleanSelector()
-        schema[vol.Optional(ATTR_BEGIN_TIME)] = selector.DateTimeSelector()
-        schema[vol.Optional(ATTR_END_TIME)] = selector.DateTimeSelector()
+        begin_default = valid.get("beginTime")
+        end_default = valid.get("endTime")
+        if begin_default:
+            schema[vol.Optional(ATTR_BEGIN_TIME, default=str(begin_default))] = selector.DateTimeSelector()
+        else:
+            schema[vol.Optional(ATTR_BEGIN_TIME)] = selector.DateTimeSelector()
+        if end_default:
+            schema[vol.Optional(ATTR_END_TIME, default=str(end_default))] = selector.DateTimeSelector()
+        else:
+            schema[vol.Optional(ATTR_END_TIME)] = selector.DateTimeSelector()
+        max_times_default = _max_times(
+            defaults.get("maxTimes")
+            or defaults.get("visitTimes")
+            or valid.get("maxTimes")
+            or valid.get("visitTimes")
+        )
+        max_times_selector = selector.NumberSelector(
+            selector.NumberSelectorConfig(min=0, max=9999, mode=selector.NumberSelectorMode.BOX)
+        )
+        if max_times_default is not None:
+            schema[vol.Optional(ATTR_MAX_TIMES, default=max_times_default)] = max_times_selector
+        else:
+            schema[vol.Optional(ATTR_MAX_TIMES)] = max_times_selector
         if include_card:
             # On edit the field shows the card the person already holds; on add it starts
             # empty. Submitting the shown card again is a no-op.

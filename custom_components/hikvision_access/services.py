@@ -19,6 +19,7 @@ from .const import (
     ATTR_EMPLOYEE_NO,
     ATTR_END_TIME,
     ATTR_GENDER,
+    ATTR_MAX_TIMES,
     ATTR_NAME,
     ATTR_PIN,
     ATTR_USER_TYPE,
@@ -46,6 +47,7 @@ CREATE_VISITOR_SCHEMA = vol.Schema(
         vol.Optional(ATTR_GENDER): vol.In(GENDERS),
         vol.Optional(ATTR_USER_TYPE, default="visitor"): vol.In(USER_TYPES),
         vol.Optional(ATTR_CARD_NO): cv.string,
+        vol.Optional(ATTR_MAX_TIMES): vol.All(vol.Coerce(int), vol.Range(min=1)),
     }
 )
 
@@ -98,6 +100,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             gender=call.data.get(ATTR_GENDER),
             user_type=call.data.get(ATTR_USER_TYPE, "visitor"),
             card_no=(call.data.get(ATTR_CARD_NO) or "").strip() or None,
+            max_times=call.data.get(ATTR_MAX_TIMES),
         )
 
         hass.bus.async_fire(
@@ -109,6 +112,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "pin": pin,
                 "begin_time": begin.isoformat(),
                 "end_time": end.isoformat(),
+                "max_times": call.data.get(ATTR_MAX_TIMES),
             },
         )
 
