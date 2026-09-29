@@ -3,8 +3,7 @@
 A Home Assistant integration for Hikvision access control terminals (door stations / face
 terminals), talking to the device directly over ISAPI. No cloud.
 
-It complements the [Hikvision Next](https://github.com/Iakovosv/Hikvision_next) integration,
-which covers NVRs and IP cameras. Install both if you have cameras and an access terminal.
+
 
 ## Everything is done from the UI
 
