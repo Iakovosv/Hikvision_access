@@ -9,7 +9,9 @@ import pytest
 
 from custom_components.hikvision_access.isapi import (
     HikvisionAccessClient,
+    _device_error,
     _isapi_time,
+    _masked_payload,
 )
 
 from .conftest import decoder, make_handler
@@ -76,6 +78,59 @@ async def test_create_person_payload(session: httpx.AsyncClient) -> None:
     assert user["Valid"]["enable"] is True
     assert user["Valid"]["beginTime"] == "2026-03-01T08:00:00"
     assert user["Valid"]["endTime"] == "2026-03-01T20:00:00"
+
+
+async def test_rejected_write_reports_the_device_reason(session: httpx.AsyncClient) -> None:
+    """A refused write explains itself instead of hiding the device's sub-status."""
+
+    from custom_components.hikvision_access.isapi import HikvisionAccessError
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "Authorization" not in request.headers:
+            return httpx.Response(401, headers={"WWW-Authenticate": 'Digest realm="DS-1", nonce="abc"'})
+        if request.url.path.endswith("UserInfo/Record"):
+            return httpx.Response(
+                400,
+                json={
+                    "statusCode": 4,
+                    "statusString": "Invalid Operation",
+                    "subStatusCode": "badJsonContent",
+                },
+            )
+        return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
+
+    session = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = HikvisionAccessClient(HOST, "admin", "secret", session=session)
+
+    with pytest.raises(HikvisionAccessError) as err:
+        await client.create_person(employee_no="900001", name="Maria", pin="123456")
+
+    message = str(err.value)
+    assert "400" in message
+    assert "badJsonContent" in message
+    # The PIN we sent must never be echoed back into a log line.
+    assert "123456" not in message
+    assert "***" in message
+
+
+def test_masked_payload_blanks_credentials() -> None:
+    """Password and PIN values are blanked before a body is put into a message."""
+
+    masked = _masked_payload('{"UserInfo": {"employeeNo": "1", "password": "123456"}}')
+    assert "123456" not in masked
+    assert '"password": "***"' in masked
+
+
+def test_device_error_reads_json_and_plain_text() -> None:
+    """The device reason is read from a JSON envelope, or kept as short text."""
+
+    json_response = httpx.Response(
+        400, json={"statusString": "Invalid Operation", "subStatusCode": "badJsonContent"}
+    )
+    assert _device_error(json_response) == "Invalid Operation (badJsonContent)"
+
+    text_response = httpx.Response(400, text="<ResponseStatus>bad</ResponseStatus>")
+    assert "ResponseStatus" in _device_error(text_response)
 
 
 async def test_forbidden_raises(session: httpx.AsyncClient) -> None:
