@@ -85,10 +85,10 @@ async def _setup_expecting_failure(hass: HomeAssistant, monkeypatch, **handler_k
     return entry
 
 
-async def test_setup_creates_door_buttons_and_last_access_sensor(
+async def test_setup_exposes_one_door_when_the_device_is_silent(
     hass: HomeAssistant, monkeypatch
 ) -> None:
-    """The device page gets door buttons and a last-access sensor, not only the binary sensor."""
+    """A terminal that does not report a door count gets a single door button."""
 
     entry, _ = await _setup(hass, monkeypatch, [ACCESS_EVENT])
     await hass.async_block_till_done()
@@ -96,10 +96,7 @@ async def test_setup_creates_door_buttons_and_last_access_sensor(
     door_buttons = [
         state for state in hass.states.async_all("button") if "open_door" in state.entity_id
     ]
-    assert {state.entity_id for state in door_buttons} == {
-        "button.front_door_open_door_1",
-        "button.front_door_open_door_2",
-    }
+    assert {state.entity_id for state in door_buttons} == {"button.front_door_open_door_1"}
 
     last_access = [
         state for state in hass.states.async_all("sensor") if "last_access" in state.entity_id
@@ -111,6 +108,27 @@ async def test_setup_creates_door_buttons_and_last_access_sensor(
     assert state.attributes["employee_no"] == "900001"
     assert state.attributes["door_no"] == 1
     assert state.attributes["granted"] is True
+
+
+async def test_setup_follows_the_door_count_of_the_device(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """The terminal reports how many doors it has, and one button is added per door."""
+
+    entry, _ = await _setup(hass, monkeypatch, [ACCESS_EVENT], door_count=4)
+    await hass.async_block_till_done()
+
+    door_buttons = {
+        state.entity_id
+        for state in hass.states.async_all("button")
+        if "open_door" in state.entity_id
+    }
+    assert door_buttons == {
+        "button.front_door_open_door_1",
+        "button.front_door_open_door_2",
+        "button.front_door_open_door_3",
+        "button.front_door_open_door_4",
+    }
 
 
 async def test_open_door_button_presses(hass: HomeAssistant, monkeypatch) -> None:

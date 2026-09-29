@@ -113,6 +113,9 @@ class HikvisionAccessCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         #: Setup keeps the entry loaded in that case, and the poll slows down until the
         #: permission is granted.
         self.event_access_denied = False
+        #: Door numbers the terminal controls, filled on the first refresh. Defaults to a
+        #: single door so a terminal that cannot be asked is never shown doors it lacks.
+        self.door_numbers: list[int] = [1]
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch access events since the previous poll."""

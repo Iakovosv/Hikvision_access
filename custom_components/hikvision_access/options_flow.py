@@ -74,6 +74,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
 
         self._entry = config_entry
         self._employee_no: str | None = None
+        self._list_error: str | None = None
 
     @property
     def _client(self):
@@ -85,6 +86,13 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
                 "The device is not set up. Fix the setup error on the integration page first."
             )
         return coordinator.client
+
+    @property
+    def _door_numbers(self) -> list[int]:
+        """Return the doors the terminal reports, defaulting to one."""
+
+        coordinator = getattr(self._entry, "runtime_data", None)
+        return list(getattr(coordinator, "door_numbers", None) or [1])
 
     async def _async_persons(self) -> list[dict[str, Any]] | None:
         """Return every person enrolled on the device, or None when it cannot be read.
@@ -101,6 +109,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
                 body = await self._client.get_users(position=position, max_results=100)
             except HikvisionAccessError as ex:
                 _LOGGER.error("Could not read the persons from the device: %s", ex)
+                self._list_error = str(ex)
                 return None
             info = body.get("UserInfoSearch", {})
             page = info.get("UserInfo") or []
@@ -119,7 +128,16 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             return await self._client.get_person(employee_no)
         except HikvisionAccessError as ex:
             _LOGGER.error("Could not read person %s from the device: %s", employee_no, ex)
+            self._list_error = str(ex)
             return None
+
+    def _cannot_list(self):
+        """Abort because the person list could not be read, showing the device's answer."""
+
+        return self.async_abort(
+            reason="cannot_list",
+            description_placeholders={"error": self._list_error or "no answer from the device"},
+        )
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         """Show the person management menu."""
@@ -162,7 +180,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
 
         persons = await self._async_persons()
         if persons is None:
-            return self.async_abort(reason="cannot_list")
+            return self._cannot_list()
         if not persons:
             return self.async_abort(reason="no_persons")
 
@@ -182,7 +200,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
 
         person = await self._load_person(employee_no)
         if person is None:
-            return self.async_abort(reason="cannot_list")
+            return self._cannot_list()
 
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -213,7 +231,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
 
         persons = await self._async_persons()
         if persons is None:
-            return self.async_abort(reason="cannot_list")
+            return self._cannot_list()
         if not persons:
             return self.async_abort(reason="no_persons")
 
@@ -440,8 +458,13 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
                 cards = HikvisionAccessOptionsFlow._card_numbers(defaults)
                 current_card = cards[0] if cards else ""
             schema[vol.Optional(ATTR_CARD_NO, default=current_card)] = selector.TextSelector()
-        schema[vol.Optional(ATTR_DOOR_NO, default=self._door_default(defaults))] = selector.NumberSelector(
-            selector.NumberSelectorConfig(min=1, max=4, mode=selector.NumberSelectorMode.BOX)
+        doors = self._door_numbers
+        door_default = self._door_default(defaults)
+        # A person may hold rights to a door the terminal did not advertise; never silently
+        # move them to another door, just widen the range to cover it.
+        highest = max([*doors, door_default])
+        schema[vol.Optional(ATTR_DOOR_NO, default=door_default)] = selector.NumberSelector(
+            selector.NumberSelectorConfig(min=1, max=highest, mode=selector.NumberSelectorMode.BOX)
         )
         return vol.Schema(schema)
 
@@ -490,13 +513,26 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             )
         )
 
-    @staticmethod
-    def _door_schema() -> vol.Schema:
+    def _door_schema(self) -> vol.Schema:
+        """Return the door picker, limited to the doors the terminal reports."""
+
+        doors = self._door_numbers
+        if len(doors) > 1:
+            return vol.Schema(
+                {
+                    vol.Optional(ATTR_DOOR_NO, default=doors[0]): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[str(door) for door in doors],
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                        )
+                    )
+                }
+            )
         return vol.Schema(
             {
-                vol.Optional(ATTR_DOOR_NO, default=1): selector.NumberSelector(
+                vol.Optional(ATTR_DOOR_NO, default=doors[0]): selector.NumberSelector(
                     selector.NumberSelectorConfig(
-                        min=1, max=4, mode=selector.NumberSelectorMode.BOX
+                        min=1, max=max(doors), mode=selector.NumberSelectorMode.BOX
                     )
                 )
             }
