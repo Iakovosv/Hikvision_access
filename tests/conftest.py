@@ -32,6 +32,7 @@ def make_handler(
     denied_paths: set[str] | None = None,
     lockout_paths: set[str] | None = None,
     error_paths: set[str] | None = None,
+    door_count: int | None = None,
 ):
     """Build a transport handler that mimics an access control terminal.
 
@@ -92,6 +93,10 @@ def make_handler(
             if device_time is None:
                 return httpx.Response(404, json={"statusCode": 4, "statusString": "Invalid Operation"})
             return httpx.Response(200, json={"Time": {"localTime": device_time, "timeZone": "CST-2:00:00"}})
+        if suffix.endswith("AccessControl/Door/Count"):
+            if door_count is None:
+                return httpx.Response(404, json={"statusCode": 4})
+            return httpx.Response(200, json={"DoorCount": {"doorNumber": f"{door_count}"}})
         if suffix.endswith("AccessControl/AcsEvent"):
             return httpx.Response(200, json={"AcsEvent": _event_page(request, events, page_size)})
         if suffix.endswith("AccessControl/UserInfo/Search"):

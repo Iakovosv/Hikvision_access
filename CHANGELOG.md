@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.1
+
+- Fixed: the door buttons were a fixed pair. A one-door terminal showed a second door that
+  does nothing. The number of doors is now asked from the device
+  (`AccessControl/Door/Count`, falling back to `System/capabilities`) and one button is added
+  per door. A device that will not say gets a single door, not a guess.
+- Fixed: the `cannot_list` message on Edit person and Delete person hid the reason. It now
+  shows the device's own answer, so a 401 permission problem reads as such instead of a
+  bare `cannot_list`.
+- The door picker in Add/Edit person is limited to the doors the terminal reports.
+- Diagnostics report `door_numbers`.
+
 ## 0.4.0
 
 - The device page now has the entities that were missing, instead of everything hiding behind
