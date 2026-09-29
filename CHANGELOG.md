@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.0
+
+- Added a Greek translation (`translations/el.json`). Before this, a Home Assistant running in
+  Greek showed the raw reason for a refused person list ("cannot_list") instead of the sentence
+  that names the missing device permission.
+- "Add person" now distinguishes a refused request from a missing permission: a 401 from the
+  device shows "The device refused the request. Check the user permissions." rather than a
+  generic failure.
+- Diagnostics probe the person list, the person count and the door count as well, so the report
+  shows exactly which endpoint the device account may use.
+- `tests/test_translations.py` fails the suite if a shipped language misses a key or drifts a
+  placeholder from English, which is what silently produced the raw "cannot_list".
+
 ## 0.5.0
 
 - Added `sensor.persons_enrolled` — how many people are enrolled on the terminal. Read from

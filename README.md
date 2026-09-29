@@ -157,19 +157,28 @@ The device answers `401 Unauthorized` in more than one situation: a wrong passwo
 locked account, and an account that is signed in but missing a permission. The error
 message alone cannot tell them apart, so the integration checks which case applies.
 
-The account used by this integration needs the Remote: Parameters Settings and Remote:
-Log Search permissions. Without Log Search, `System/deviceInfo` succeeds (which is why
-the config flow accepts the credentials) while `AccessControl/AcsEvent` returns 401. If
-you see this, edit the user on the terminal and grant Remote: Log Search; do not change
-the password, it is already correct.
+The account used by this integration needs two permissions on the terminal:
+
+- **Remote: Parameters Settings** — the person list, the person count and creating or
+  editing people (`/ISAPI/AccessControl/UserInfo/*`). Without it, "Edit person" and
+  "Delete person" abort with the device's own answer, and "Add person" reports a refused
+  request.
+- **Remote: Log Search** — the access events behind `sensor.last_access_time` and
+  `binary_sensor.last_access` (`/ISAPI/AccessControl/AcsEvent`). Without it, `System/deviceInfo`
+  succeeds (which is why the config flow accepts the credentials) while `AcsEvent` returns 401.
+  Grant Remote: Log Search; do not change the password, it is already correct.
+
+After granting a permission, press the **Refresh people** button on the device page, or reload
+the config entry. A full restart is not needed.
 
 Another case is the lockout that follows repeated failed logins. The device then returns
 401 for every request, including the ones that worked before, for about 30 minutes. Wait
 for it to expire; the integration will not keep trying and extend it.
 
 To see which endpoint the account may use, download the diagnostics from the integration
-page. The `probe` section reports `ok` or an error for both `System/deviceInfo` and
-`AccessControl/AcsEvent`; the host and credentials are redacted.
+page. The `probe` section reports `ok` or an error for `System/deviceInfo`,
+`AccessControl/AcsEvent`, `AccessControl/UserInfo/Search`, `AccessControl/UserInfo/Count`
+and `AccessControl/Door/Count`; the host and credentials are redacted.
 
 If the terminal clock drifts more than a minute from Home Assistant, a warning is logged
 at startup. The device filters events by its own clock, so a large drift means entries

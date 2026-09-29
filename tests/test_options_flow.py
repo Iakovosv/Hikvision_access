@@ -312,3 +312,18 @@ async def test_edit_form_prefills_door_from_person(hass: HomeAssistant, monkeypa
     schema = form["data_schema"].schema
     door_key = next(k for k in schema if getattr(k, "schema", k) == "door_no")
     assert door_key.default() == 3
+
+
+async def test_add_person_without_permission_names_the_permission(hass: HomeAssistant, monkeypatch) -> None:
+    """A refused create shows the permission error, not a generic failure."""
+
+    entry, _ = await _setup(
+        hass, monkeypatch, users=[PERSON], denied_paths={"AccessControl/UserInfo/Record"}
+    )
+    flow = await _flow(hass, entry)
+
+    result = await flow.async_step_add(
+        {"employee_no": "2002", "name": "Nikos", "gender": "male", "user_type": "normal"}
+    )
+    assert result["type"] == "form"
+    assert result["errors"]["base"] == "insufficient_permission"
