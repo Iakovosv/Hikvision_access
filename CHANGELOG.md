@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.6.9
+
+- **The README now says what the integration is, and that everything is set up from the UI.**
+  A new opening section states plainly that the device, the people, the cards, the
+  notifications and the lights blueprint are all configured from the Home Assistant interface,
+  and that the YAML is optional (for automations you write yourself, or for the visitor
+  services). Until now the README led with five YAML blocks and read like a code-only
+  integration, with a single "No YAML required" line buried under person management.
+- **A table of every entity**, what it is and what to use it for, plus the Configure menu
+  option by option.
+- **Fixed the description of the spoken announcement.** It claimed the announcement was static
+  text that could not name the visitor. It is not: the announcement goes through the same
+  placeholder substitution as the notification, so `Καλώς ήρθες {name}` says the name.
+- **Notifying and announcing are documented in full**, including the `Announce every entry`
+  switch (previously not mentioned at all), the fact that both share the `Names to watch` list,
+  and the deliberate rule that enabling notifications with no "every entry", no names and no
+  refused-access alert sends nothing.
+- The events, the services, the Activity log and the permissions section are grouped under
+  clearer headings; the YAML moved to an `Examples (optional)` section at the end.
+
 ## 0.6.8
 
 - **Optional notification when someone enters.** Open `Configure` and choose
