@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2
+
+- Diagnostics now run the endpoint probes even when setup failed. That is the case where
+  they matter most: with the integration not set up there is no coordinator, and the
+  previous version returned only the entry fields, so the report could not say whether
+  `AccessControl/AcsEvent` was refused for a permission, a lockout or a wrong password.
+
 ## 0.2.1
 
 - Stop reporting a permission problem as a wrong password. ISAPI answers 401 both when
