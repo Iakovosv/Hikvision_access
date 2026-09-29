@@ -24,7 +24,9 @@ async def async_setup_entry(
     """Add the last-access sensor."""
 
     coordinator: HikvisionAccessCoordinator = entry.runtime_data
-    async_add_entities([LastAccessSensor(coordinator), PersonsEnrolledSensor(coordinator)])
+    async_add_entities(
+        [LastAccessSensor(coordinator), LastAccessPersonSensor(coordinator), PersonsEnrolledSensor(coordinator)]
+    )
 
 
 class LastAccessSensor(HikvisionAccessEntity, CoordinatorEntity, SensorEntity):
@@ -49,7 +51,71 @@ class LastAccessSensor(HikvisionAccessEntity, CoordinatorEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
-        """Expose who authenticated and through which door."""
+        """Expose who authenticated, through which door, and the exact date and time.
+
+        The state itself is a timestamp, which the frontend shows as a relative time
+        ("9 hours ago"). The precise date and time are added here so a dashboard card can
+        show them, in the machine-readable attributes and as ready-made strings.
+        """
+
+        if self.coordinator.event_access_denied:
+            return {"reason": "The device account may not read access events"}
+
+        event = self.coordinator.last_event
+        if event is None:
+            return {}
+        local = event.time.astimezone()
+        return {
+            "name": event.name,
+            "employee_no": event.employee_no,
+            "card_no": event.card_no,
+            "door_no": event.door_no,
+            "method": event.method,
+            "granted": event.granted,
+            "date": local.strftime("%Y-%m-%d"),
+            "time": local.strftime("%H:%M:%S"),
+            "datetime": local.isoformat(),
+        }
+
+
+class LastAccessPersonSensor(HikvisionAccessEntity, CoordinatorEntity, SensorEntity):
+    """Name the person who last opened the door.
+
+    The last-access binary sensor can only read `on`/`off`, which the frontend labels
+    "Detected", so the person's name has no place there. This sensor carries the name as
+    its state instead, which is what the device page and a dashboard card read.
+    """
+
+    _attr_translation_key = "last_access_person"
+    _attr_icon = "mdi:account-check"
+
+    def __init__(self, coordinator: HikvisionAccessCoordinator) -> None:
+        """Initialize the sensor."""
+
+        HikvisionAccessEntity.__init__(self, coordinator)
+        CoordinatorEntity.__init__(self, coordinator)
+        self._attr_unique_id = f"{coordinator.serial_no}_last_access_person"
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the name of the last person, falling back to their employee number."""
+
+        event = self.coordinator.last_event
+        if event is None:
+            return None
+        return event.name or event.employee_no
+
+    @property
+    def available(self) -> bool:
+        """Whether the coordinator has data and may read events."""
+
+        if self.coordinator.event_access_denied:
+            return False
+        return super().available
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Expose the details of that access."""
 
         if self.coordinator.event_access_denied:
             return {"reason": "The device account may not read access events"}
@@ -58,12 +124,12 @@ class LastAccessSensor(HikvisionAccessEntity, CoordinatorEntity, SensorEntity):
         if event is None:
             return {}
         return {
-            "name": event.name,
             "employee_no": event.employee_no,
             "card_no": event.card_no,
             "door_no": event.door_no,
             "method": event.method,
             "granted": event.granted,
+            "time": event.time.isoformat(),
         }
 
 

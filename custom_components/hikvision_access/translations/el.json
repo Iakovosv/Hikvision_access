@@ -133,7 +133,11 @@
   "entity": {
     "binary_sensor": {
       "last_access": {
-        "name": "Τελευταία πρόσβαση"
+        "name": "Τελευταία πρόσβαση",
+        "state": {
+          "off": "Καμία πρόσβαση ακόμη",
+          "on": "Εντοπίστηκε πρόσβαση"
+        }
       }
     },
     "button": {
@@ -147,6 +151,9 @@
     "sensor": {
       "last_access": {
         "name": "Ώρα τελευταίας πρόσβασης"
+      },
+      "last_access_person": {
+        "name": "Τελευταίο πρόσωπο"
       },
       "persons_enrolled": {
         "name": "Καταχωρημένα πρόσωπα"

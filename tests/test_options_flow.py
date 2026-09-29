@@ -501,6 +501,51 @@ async def test_notifications_step_saves_the_settings(hass: HomeAssistant, monkey
     assert result["data"]["notify_all"] is True
 
 
+async def test_notifications_step_accepts_empty_entity_fields(hass: HomeAssistant, monkeypatch) -> None:
+    """An untouched page submits, with the announcement and notify entities left empty.
+
+    The fields start empty and the stock entity selector rejects an empty string, so
+    submitting the page unchanged failed with "Entity is neither a valid entity ID nor a
+    valid UUID" and nothing was saved, even with announcements turned off.
+    """
+
+    entry, _ = await _setup(hass, monkeypatch)
+    flow = await _flow(hass, entry)
+
+    form = await flow.async_step_notifications()
+    schema = form["data_schema"]
+
+    submitted = {
+        "notify_service": "",
+        "tts_entity": "",
+        "tts_media_player": "",
+    }
+    result = schema(submitted)
+    assert result["notify_service"] == ""
+    assert result["tts_entity"] == ""
+    assert result["tts_media_player"] == ""
+
+    assert (await flow.async_step_notifications(submitted))["type"] == "create_entry"
+
+
+async def test_notifications_schema_serializes_for_the_frontend(hass: HomeAssistant, monkeypatch) -> None:
+    """The form schema must convert to the JSON the frontend renders."""
+
+    from homeassistant.helpers import config_validation as cv
+    from probatio import to_field_list
+
+    entry, _ = await _setup(hass, monkeypatch)
+    flow = await _flow(hass, entry)
+    form = await flow.async_step_notifications()
+
+    fields = to_field_list(form["data_schema"], custom_serializer=cv.custom_serializer)
+    names = {field["name"] for field in fields}
+    assert {"notify_service", "tts_entity", "tts_media_player"} <= names
+    for field in fields:
+        if field["name"] in {"notify_service", "tts_entity", "tts_media_player"}:
+            assert field["default"] == ""
+
+
 async def test_person_action_keeps_the_notification_settings(
     hass: HomeAssistant, monkeypatch
 ) -> None:

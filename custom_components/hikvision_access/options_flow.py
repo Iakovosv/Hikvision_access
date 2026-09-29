@@ -58,6 +58,7 @@ from .const import (
     VISIT_TIMES_TOTAL_KEYS,
     VISIT_TIMES_USED_KEYS,
 )
+from .entity_selector import OptionalEntitySelector
 from .isapi import HikvisionAccessError, HikvisionAccessForbiddenError
 
 _LOGGER = logging.getLogger(__name__)
@@ -367,7 +368,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
                 ): selector.BooleanSelector(),
                 vol.Optional(
                     CONF_NOTIFY_SERVICE, default=str(options.get(CONF_NOTIFY_SERVICE) or "")
-                ): selector.EntitySelector(
+                ): OptionalEntitySelector(
                     selector.EntitySelectorConfig(domain="notify", multiple=False)
                 ),
                 vol.Optional(
@@ -407,12 +408,12 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
                 ): selector.BooleanSelector(),
                 vol.Optional(
                     CONF_TTS_ENTITY, default=str(options.get(CONF_TTS_ENTITY) or "")
-                ): selector.EntitySelector(
+                ): OptionalEntitySelector(
                     selector.EntitySelectorConfig(domain="tts", multiple=False)
                 ),
                 vol.Optional(
                     CONF_TTS_MEDIA_PLAYER, default=str(options.get(CONF_TTS_MEDIA_PLAYER) or "")
-                ): selector.EntitySelector(
+                ): OptionalEntitySelector(
                     selector.EntitySelectorConfig(domain="media_player", multiple=False)
                 ),
                 vol.Optional(
