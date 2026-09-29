@@ -129,23 +129,5 @@
         "name": "Καταχωρημένα πρόσωπα"
       }
     }
-  },
-  "logbook": {
-    "granted": "Ο/Η {name} άνοιξε την πόρτα ({method}, πόρτα {door})",
-    "granted_with_card": "Ο/Η {name} άνοιξε την πόρτα με κάρτα {card} (πόρτα {door})",
-    "denied": "Απορρίφθηκε η πρόσβαση για {name} (πόρτα {door})",
-    "method": {
-      "access": "πρόσβαση",
-      "card": "κάρτα",
-      "fp": "δακτυλικό αποτύπωμα",
-      "cardAndPw": "κάρτα + PIN",
-      "fpAndPw": "δακτυλικό + PIN",
-      "fpOrCard": "δακτυλικό ή κάρτα",
-      "fpAndCard": "δακτυλικό + κάρτα",
-      "fpAndCardAndPw": "δακτυλικό + κάρτα + PIN",
-      "fpOrPw": "δακτυλικό ή PIN",
-      "cardOrPw": "κάρτα ή PIN",
-      "cardOrFpOrPw": "κάρτα, δακτυλικό ή PIN"
-    }
   }
 }
