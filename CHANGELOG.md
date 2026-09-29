@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.10
+
+- **The edit form now shows the dates you already set.** Turning on "Limit the validity
+  period" and opening Edit showed an empty "Valid from" / "Valid until" even though the
+  person had a window on the terminal; the form only carried the enable flag, never the
+  two dates, so the values the device returns were dropped. Both fields are now filled
+  from the device, and a person without a window still leaves them blank.
+- **A maximum number of uses can be set.** Visitor credentials can be limited to a fixed
+  number of entries. The value is sent to the device as `maxTimes`; an empty field or 0
+  means no limit and the field is left out of the request entirely, so firmware that
+  predates the field still accepts the write.
+- The person summary reads `maxTimes` from the device alongside the other visit counters.
+
 ## 0.6.9
 
 - **The README now says what the integration is, and that everything is set up from the UI.**

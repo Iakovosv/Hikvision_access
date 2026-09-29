@@ -46,15 +46,17 @@ The names follow the Home Assistant language, so a Greek interface shows `Τελ
 
 Everything under `Configure` is a point-and-click form. The choices are:
 
-- **Add person** — employee ID, name, gender, person type, PIN, card, door, and an optional
-  validity window. Leave the employee ID empty for an automatic one and the PIN empty for a
-  random 6-digit one.
+- **Add person** — employee ID, name, gender, person type, PIN, card, door, an optional
+  validity window and an optional maximum number of uses. Leave the employee ID empty for an
+  automatic one and the PIN empty for a random 6-digit one. Leave the usage limit empty (or 0)
+  for no limit.
 - **Edit person** — pick a person from the list. The form shows what the device currently holds
   (type, gender, validity, cards, fingerprints and the visitor visit counters) and lets you
-  change everything in one place: name, PIN, validity, door and card. The PIN and card fields are
-  prefilled with what the person already has, so submitting the form untouched changes nothing;
-  type a new number to replace them. Leave the PIN empty to keep the current one. Fingerprints can
-  only be enrolled on the device itself.
+  change everything in one place: name, PIN, validity, door, card and usage limit. The PIN,
+  validity dates and card fields are prefilled with what the person already has, so submitting
+  the form untouched changes nothing; type a new value to replace it. Leave the PIN empty to keep
+  the current one, and leave the usage limit empty (or 0) to keep the current limit or leave it
+  unlimited. Fingerprints can only be enrolled on the device itself.
 - **Delete person** — pick a person and confirm.
 - **Open door** — unlock a door once.
 - **Notifications & announcements** — the optional alerts described below.
@@ -261,7 +263,11 @@ actions:
       name: Maria Papadopoulou
       begin_time: "2026-10-01 09:00:00"
       end_time: "2026-10-01 21:00:00"
+      max_times: 2
 ```
+
+`max_times` is optional: leave it out for a visitor who may enter any number of
+times inside the window, or set a positive number to allow only that many entries.
 
 The generated PIN and the assigned employee number are published on the
 `hikvision_access_visitor_created` event:
