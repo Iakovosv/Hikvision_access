@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.4
+
+- **Refused writes now explain themselves.** A rejected `UserInfo/Record` or `UserInfo/Modify`
+  answered with a bare `400`, hiding the device's own reason inside a body the client threw
+  away. The error now carries the device's `statusString`/`subStatusCode` and the request body
+  (with `password`/`pin` blanked), so the next report says *why* a person could not be saved
+  instead of only that it failed. No behaviour change on success.
+
 ## 0.6.3
 
 - **Fixed person management failing on a correctly configured device.** The terminal accepts

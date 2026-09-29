@@ -6,7 +6,7 @@ import asyncio
 import datetime as dt
 import json
 import logging
-from typing import Any
+from typing import Any, Final
 
 import httpx
 from homeassistant.util import dt as dt_util
@@ -205,7 +205,10 @@ class HikvisionAccessClient:
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as ex:
-            raise HikvisionAccessError(f"Device returned {response.status_code} for {url}") from ex
+            raise HikvisionAccessError(
+                f"Device returned {response.status_code} for {method} {url}"
+                f" (sent {_masked_payload(data)}; device said {_device_error(response)})"
+            ) from ex
 
         if not response.content:
             return {}
@@ -626,6 +629,54 @@ def _find_door_count(capabilities: Any) -> int | None:
 
 def _json(payload: dict[str, Any]) -> str:
     return json.dumps(payload)
+
+
+#: Fields whose values must never reach the log, whatever the device answered.
+_SECRET_FIELDS: Final = ("password", "pin")
+
+
+def _masked_payload(data: str | None) -> str:
+    """Return the request body with credentials blanked, for an error message."""
+
+    if not data:
+        return "-"
+    try:
+        payload = json.loads(data)
+    except ValueError:
+        return data
+
+    def _mask(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {key: ("***" if key.lower() in _SECRET_FIELDS else _mask(item)) for key, item in value.items()}
+        if isinstance(value, list):
+            return [_mask(item) for item in value]
+        return value
+
+    return json.dumps(_mask(payload))
+
+
+def _device_error(response: httpx.Response) -> str:
+    """Extract the device's own status code and message from an error reply.
+
+    ISAPI answers a rejected write with a body such as
+    `{"statusCode":4,"statusString":"Invalid Operation","subStatusCode":"badJsonContent"}`.
+    That sub-status is the only thing that says *why* the write was refused, so it is
+    surfaced instead of being swallowed by a bare status line.
+    """
+
+    if not response.content:
+        return "no detail"
+    try:
+        body = response.json()
+    except ValueError:
+        text = response.text.strip().replace("\n", " ")
+        return text[:200] if text else "no detail"
+
+    if not isinstance(body, dict):
+        return str(body)[:200]
+    status = body.get("statusString") or body.get("statusCode") or "unknown"
+    sub = body.get("subStatusCode")
+    return f"{status} ({sub})" if sub else str(status)
 
 
 def _isapi_time(value: dt.datetime) -> str:
