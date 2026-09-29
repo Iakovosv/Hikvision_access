@@ -16,7 +16,7 @@ from homeassistant.util import dt as dt_util
 from .const import (
     ACS_EVENT_INITIAL_LOOKBACK_SECONDS,
     ACS_EVENT_MAJOR,
-    ACS_EVENT_MINOR_SUCCESS,
+    ACS_EVENT_SUCCESS_MINORS,
     DOMAIN,
     EVENT_DEDUP_WINDOW_SECONDS,
     EVENT_TYPE_ACCESS,
@@ -50,6 +50,29 @@ class AccessEvent:
     major: int
     minor: int
     event_id: str | None
+    verify_mode: str | None = None
+
+    @property
+    def granted(self) -> bool:
+        """Whether the event is a granted authentication.
+
+        Firmware numbers the success codes differently (the reference terminal reports a
+        card read as `minor=1` where the guide says `38`), so a present card number counts
+        as a grant on its own, and the documented success codes are accepted as well.
+        """
+
+        return bool(self.card_no) or self.minor in ACS_EVENT_SUCCESS_MINORS
+
+    @property
+    def method(self) -> str:
+        """Return the verify mode the device reported for this access.
+
+        This is the raw mode key (e.g. `cardOrFpOrPw`), which the logbook translates. The
+        device reports the combination it accepts rather than the method actually used, so
+        the card number is what tells whether a card was involved.
+        """
+
+        return self.verify_mode or "access"
 
     @property
     def unique_id(self) -> str:
@@ -207,7 +230,13 @@ class HikvisionAccessCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.update_interval = interval
 
     def _build_event(self, raw: dict[str, Any]) -> AccessEvent | None:
-        """Turn one ISAPI event into an AccessEvent, ignoring non-access entries."""
+        """Turn one ISAPI event into an AccessEvent, ignoring non-access entries.
+
+        `minor=0` returns every access event, including the door-state pairs (open/close)
+        that carry no identity. Only entries that name a person, an employee number or a
+        card are kept, so the last-access entities always answer "who", and a real
+        authentication is never mistaken for the door simply opening.
+        """
 
         try:
             major = int(raw.get("major", 0))
@@ -218,16 +247,23 @@ class HikvisionAccessCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if major != ACS_EVENT_MAJOR:
             return None
 
+        name = raw.get("name") or None
+        employee_no = raw.get("employeeNoString") or raw.get("employeeNo") or None
+        card_no = raw.get("cardNo") or None
+        if not (name or employee_no or card_no):
+            return None
+
         return AccessEvent(
             serial_no=self.serial_no,
             time=_parse_time(raw.get("time")),
-            name=raw.get("name") or None,
-            employee_no=raw.get("employeeNoString") or raw.get("employeeNo") or None,
-            card_no=raw.get("cardNo") or None,
+            name=name,
+            employee_no=employee_no,
+            card_no=card_no,
             door_no=raw.get("doorNo"),
             major=major,
             minor=minor,
             event_id=raw.get("eventId") or raw.get("serialNo"),
+            verify_mode=raw.get("currentVerifyMode") or None,
         )
 
     def _event_payload(self, event: AccessEvent) -> dict[str, Any]:
@@ -241,10 +277,12 @@ class HikvisionAccessCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "door_no": event.door_no,
             "time": event.time.isoformat(),
             "minor": event.minor,
+            "method": event.method,
+            "granted": event.granted,
         }
 
     @property
     def is_entry_granted(self) -> bool:
         """Whether the last event was a successful authentication."""
 
-        return self.last_event is not None and self.last_event.minor == ACS_EVENT_MINOR_SUCCESS
+        return self.last_event is not None and self.last_event.granted

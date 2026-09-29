@@ -1,22 +1,38 @@
-MIT License
+Copyright (c) 2026 Iakovosv. All rights reserved.
 
-Copyright (c) 2026 Iakovosv
-Copyright (c) 2026 Iakovosv (Hikvision Access Control)
+This software and its source code (the "Software") are the exclusive property of
+Iakovosv (the "Author"). The Software is made available publicly for personal,
+non-commercial use with Home Assistant, and for viewing the source.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+No licence, express or implied, is granted to use, copy, modify, merge, publish,
+distribute, sublicense, sell, or otherwise exploit the Software, in whole or in
+part, except under the conditions below. No permission is granted by the fact that
+the source is visible.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+  1. You may install and run the Software, unmodified, for your own personal,
+     non-commercial use on your own Home Assistant system.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+  2. You may not copy, redistribute, republish, mirror, or make the Software, or
+     any derivative of it, available to anyone else, in any form, including but
+     not limited to: another source-code repository, a fork, a package or module
+     registry, a HACS repository, a container image, an archive, a website, or any
+     on-line or physical medium.
+
+  3. You may not modify, adapt, translate, or create derivative works from the
+     Software, and you may not use it, or any part of it, in another product or
+     project, without the prior written permission of the Author.
+
+  4. You may not use the Software, in whole or in part, for any commercial purpose
+     without the prior written permission of the Author.
+
+Any use beyond these conditions requires the prior written permission of the
+Author. To request a licence, open an issue at
+https://github.com/Iakovosv/Hikvision_access/issues or contact the Author through
+the repository.
+
+This Software is provided "AS IS", without warranty of any kind, express or
+implied, including but not limited to the warranties of merchantability, fitness
+for a particular purpose and non-infringement. In no event shall the Author be
+liable for any claim, damages or other liability, whether in an action of
+contract, tort or otherwise, arising from, out of or in connection with the
+Software or the use or other dealings in the Software.

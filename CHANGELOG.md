@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.6.7
+
+- **Access events are visible again, and they name the person.** The poll asked the device
+  for `minor=75`, the documented "face authentication success" code. The reference terminal
+  never reports that code: it reports a card read as `minor=1`, and answers `NO MATCH` to a
+  `minor=75` query, so the last-access entities stayed empty and the morning the door opened
+  was nowhere to be seen. The poll now asks for **every** minor type (`minor=0`, which the
+  device supports) and keeps the events that carry an identity (a name, an employee number or
+  a card), so card, fingerprint, face and PIN opens are all picked up.
+- **An access now shows up in the Activity log** of the device page. A `logbook` platform
+  renders one line per opening, naming the person and the door, e.g. *"House cleaner opened
+  the door with card 2673003718 (door 1)"*, translated with the rest of the integration
+  (Greek included). The `hikvision_access_event` bus event now also carries `method` and
+  `granted`.
+- The last-access sensor and binary sensor gained a `method` attribute (the verify mode the
+  device reported), and `granted` is now derived from the event instead of a fixed code, so
+  it is correct on firmware that numbers the codes differently.
+- The first poll after a start now looks back a day instead of an hour, so an access while
+  Home Assistant was down, or an event from the visit window, is not lost on restart.
+- A door-state event (the open/close pair, `minor=21`/`22`) carries no person and is no
+  longer taken for an access.
+- **Licence changed.** The integration was MIT; it is now source-available only. It stays
+  free to install and run for personal use, but copying, redistributing, modifying or
+  using it commercially needs written permission (see `LICENSE`).
+
 ## 0.6.6
 
 - **The edit form now shows the PIN a person already has.** The terminal returns it as
