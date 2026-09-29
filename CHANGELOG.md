@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.1
+
+- A missing `Remote: Log Search` permission no longer fails setup. Before, if the account
+  could not read access events, the whole entry went to `Setup failed` and the `Configure`
+  button (person management), the services, diagnostics and the door control were all
+  unreachable even though none of them need access events.
+  Now the entry loads, the account permission is reported once as a warning, the
+  last-access sensor shows as unavailable with the reason, and the event poll slows to
+  every 5 minutes. Granting the permission on the device recovers automatically on the
+  next poll, with no restart.
+- A transport error (device unreachable, HTTP 500) still keeps retrying, and a wrong
+  password still asks for reauthentication, so those cases are unchanged.
+
 ## 0.3.0
 
 - Manage people from the Home Assistant UI. The integration's `Configure` button now opens a

@@ -45,6 +45,7 @@ async def async_get_config_entry_diagnostics(
             "firmware": coordinator.device_info.get("firmwareVersion"),
         },
         "last_update_success": coordinator.last_update_success,
+        "event_access_denied": coordinator.event_access_denied,
         "last_exception": type(coordinator.last_exception).__name__ if coordinator.last_exception else None,
         "probe": await _probe_endpoints(hass, entry, client=client),
     }

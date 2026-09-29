@@ -172,18 +172,59 @@ async def test_open_door_service(hass: HomeAssistant, monkeypatch) -> None:
     assert b"<cmd>open</cmd>" in door.content
 
 
-async def test_setup_without_event_permission_fails_with_actionable_error(
+async def test_setup_without_event_permission_stays_loaded(
     hass: HomeAssistant, monkeypatch
 ) -> None:
-    """A valid account missing event permission does not enter a reauth loop."""
+    """A valid account missing event permission loads and keeps the other features.
 
-    entry = await _setup_expecting_failure(hass, monkeypatch, denied_paths={"AccessControl/AcsEvent"})
+    Failing setup here would hide person management, the services and the door control
+    behind a permission that only the access event sensor needs.
+    """
+
+    entry, _ = await _setup(hass, monkeypatch, denied_paths={"AccessControl/AcsEvent"})
 
     from homeassistant.config_entries import ConfigEntryState
 
-    # Not SETUP_RETRY (which would loop for a cause that cannot recover on its own) and
-    # not requiring reauthentication, because the password is fine.
-    assert entry.state is ConfigEntryState.SETUP_ERROR
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.runtime_data.event_access_denied is True
+    # Event polling slows down instead of hammering a device that will keep refusing.
+    assert entry.runtime_data.update_interval.total_seconds() == 300
+    # The features that do not need events are available.
+    assert hass.services.has_service(DOMAIN, "open_door")
+
+
+async def test_setup_recovers_when_permission_is_granted(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """The entry starts polling normally again once events are allowed."""
+
+    entry, _ = await _setup(hass, monkeypatch, denied_paths={"AccessControl/AcsEvent"})
+    coordinator = entry.runtime_data
+    assert coordinator.event_access_denied
+
+    # Grant the permission and poll once more, the way a later refresh would.
+    client = coordinator.client
+    original = client.get_all_access_events
+
+    async def allowed(start, end):
+        return [ACCESS_EVENT]
+
+    monkeypatch.setattr(client, "get_all_access_events", allowed)
+    await coordinator.async_refresh()
+
+    assert coordinator.event_access_denied is False
+    assert coordinator.update_interval.total_seconds() == 30
+    assert coordinator.last_event is not None
+
+
+async def test_setup_retries_on_transport_error(hass: HomeAssistant, monkeypatch) -> None:
+    """A device that cannot be reached keeps retrying instead of loading."""
+
+    entry = await _setup_expecting_failure(hass, monkeypatch, error_paths={"AccessControl/AcsEvent"})
+
+    from homeassistant.config_entries import ConfigEntryState
+
+    assert entry.state is ConfigEntryState.SETUP_RETRY
 
 
 async def test_diagnostics_redact_credentials(hass: HomeAssistant, monkeypatch) -> None:
@@ -204,14 +245,14 @@ async def test_diagnostics_redact_credentials(hass: HomeAssistant, monkeypatch) 
 
 
 async def test_diagnostics_probe_when_setup_failed(hass: HomeAssistant, monkeypatch) -> None:
-    """Diagnostics still run the endpoint probes when setup failed.
+    """Diagnostics run the endpoint probes even when the entry did not load.
 
     Setup failure is the case where the probe matters most: it is the only way to tell a
     missing Log Search permission from a wrong password from the support report.
     """
 
     entry = await _setup_expecting_failure(
-        hass, monkeypatch, denied_paths={"AccessControl/AcsEvent"}
+        hass, monkeypatch, error_paths={"AccessControl/AcsEvent"}
     )
 
     session = httpx.AsyncClient(
@@ -233,3 +274,19 @@ async def test_diagnostics_probe_when_setup_failed(hass: HomeAssistant, monkeypa
     dumped = str(diagnostics["entry"])
     assert "secret" not in dumped
     assert "192.0.2.10" not in dumped
+
+
+async def test_diagnostics_report_denied_events_while_loaded(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """A loaded entry with denied events reports the probe failure and the flag."""
+
+    entry, _ = await _setup(hass, monkeypatch, denied_paths={"AccessControl/AcsEvent"})
+
+    from custom_components.hikvision_access.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+
+    diagnostics = await async_get_config_entry_diagnostics(hass, entry)
+    assert "HikvisionAccessPermissionError" in diagnostics["probe"]["access_events"]
+    assert diagnostics["event_access_denied"] is True
