@@ -250,6 +250,37 @@ async def test_missing_permission_is_not_an_auth_failure() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("endpoint", "expected"),
+    [
+        ("AccessControl/AcsEvent", "Log Search"),
+        ("AccessControl/UserInfo/Search", "Parameters Settings"),
+        ("AccessControl/UserInfo/Record", "Parameters Settings"),
+    ],
+)
+async def test_permission_error_names_the_right_permission(endpoint, expected) -> None:
+    """A 401 names the one permission the refused endpoint needs, not both.
+
+    Sending a user to enable both permissions when only one is missing makes them look
+    for the wrong setting on the terminal.
+    """
+
+    from custom_components.hikvision_access.isapi import HikvisionAccessPermissionError
+
+    session = httpx.AsyncClient(
+        transport=httpx.MockTransport(make_handler(denied_paths={endpoint}))
+    )
+    client = HikvisionAccessClient(HOST, "admin", "secret", session=session)
+    await client.get_device_info()
+
+    with pytest.raises(HikvisionAccessPermissionError) as excinfo:
+        await client.request("GET", endpoint)
+
+    message = str(excinfo.value)
+    assert expected in message
+    assert "Log Search and Remote" not in message
+
+
 async def test_wrong_password_is_an_auth_failure() -> None:
     """A 401 when the identity cannot be confirmed stays a credential error."""
 
