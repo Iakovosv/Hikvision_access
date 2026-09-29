@@ -85,9 +85,79 @@ async def _setup_expecting_failure(hass: HomeAssistant, monkeypatch, **handler_k
     return entry
 
 
+async def test_setup_creates_door_buttons_and_last_access_sensor(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """The device page gets door buttons and a last-access sensor, not only the binary sensor."""
+
+    entry, _ = await _setup(hass, monkeypatch, [ACCESS_EVENT])
+    await hass.async_block_till_done()
+
+    door_buttons = [
+        state for state in hass.states.async_all("button") if "open_door" in state.entity_id
+    ]
+    assert {state.entity_id for state in door_buttons} == {
+        "button.front_door_open_door_1",
+        "button.front_door_open_door_2",
+    }
+
+    last_access = [
+        state for state in hass.states.async_all("sensor") if "last_access" in state.entity_id
+    ]
+    assert len(last_access) == 1
+    state = last_access[0]
+    assert state.state == "2026-09-28T06:15:00+00:00"
+    assert state.attributes["name"] == "Maria"
+    assert state.attributes["employee_no"] == "900001"
+    assert state.attributes["door_no"] == 1
+    assert state.attributes["granted"] is True
+
+
+async def test_open_door_button_presses(hass: HomeAssistant, monkeypatch) -> None:
+    """Pressing a door button sends the unlock command to the device."""
+
+    entry, captured = await _setup(hass, monkeypatch, [ACCESS_EVENT])
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        "button",
+        "press",
+        {"entity_id": "button.front_door_open_door_1"},
+        blocking=True,
+    )
+
+    door = [r for r in captured if "RemoteControl/door/1" in str(r.url)][-1]
+    assert b"<cmd>open</cmd>" in door.content
+
+
+async def test_last_access_sensor_is_unknown_before_any_event(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """With no event yet the timestamp sensor has no value instead of a fake one."""
+
+    entry, _ = await _setup(hass, monkeypatch, [])
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.front_door_last_access_time")
+    assert state is not None
+    assert state.state == "unknown"
+
+
+async def test_entities_survive_without_event_permission(hass: HomeAssistant, monkeypatch) -> None:
+    """Denied events leave the door buttons usable and explain the sensor."""
+
+    entry, _ = await _setup(hass, monkeypatch, denied_paths={"AccessControl/AcsEvent"})
+    await hass.async_block_till_done()
+
+    assert hass.states.get("button.front_door_open_door_1") is not None
+
+    state = hass.states.get("sensor.front_door_last_access_time")
+    assert state is not None
+    assert "reason" in state.attributes
+
+
 async def test_setup_registers_device_and_binary_sensor(hass: HomeAssistant, monkeypatch) -> None:
     """Setup creates the device and the last access binary sensor."""
-
     entry, _ = await _setup(hass, monkeypatch, [ACCESS_EVENT])
 
     from homeassistant.helpers import device_registry as dr

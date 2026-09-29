@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.0
+
+- The device page now has the entities that were missing, instead of everything hiding behind
+  the gear menu:
+  - `sensor.last_access_time` — a timestamp entity for the last authentication, with the name,
+    employee number, card number and door as attributes. Answers "who entered and when".
+  - `button.open_door_1` and `button.open_door_2` — unlock a door from a dashboard or an
+    automation.
+- `Edit person` shows a single form with everything about the person, including the card. The
+  card field is prefilled with the current card, so submitting the form untouched changes
+  nothing; typing a new number replaces the card. The separate `Manage card` menu entry is gone.
+- Fixed: `Edit person` and the card menu raised an exception and showed nothing when the
+  device refused the person list (an account without `Remote: Parameters Settings` answers
+  401 on `UserInfo/Search`). The flow now explains the missing permission.
+- Fixed: an invalid validity window on the edit form raised out of the flow instead of showing
+  a form error.
+- A door number that cannot be parsed no longer raises; it falls back to door 1.
+
 ## 0.3.1
 
 - A missing `Remote: Log Search` permission no longer fails setup. Before, if the account
