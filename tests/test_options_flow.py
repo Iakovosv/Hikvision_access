@@ -6,6 +6,7 @@ import json
 
 import httpx
 import pytest
+import voluptuous as vol
 from homeassistant.core import HomeAssistant
 
 from custom_components.hikvision_access.const import DOMAIN
@@ -96,6 +97,76 @@ async def test_add_person_auto_allocates_number_and_pin(hass: HomeAssistant, mon
     assert user["employeeNo"] == "900002"
     assert len(user["password"]) == 6
     assert user["password"].isdigit()
+
+
+async def test_add_person_sends_the_usage_limit(hass: HomeAssistant, monkeypatch) -> None:
+    """A positive maximum number of uses is sent to the device as maxTimes."""
+
+    entry, captured = await _setup(hass, monkeypatch)
+    flow = await _flow(hass, entry)
+
+    result = await flow.async_step_add({"name": "Visitor", "user_type": "visitor", "max_times": 3})
+    assert result["type"] == "create_entry"
+
+    record = [r for r in captured if r.url.path.endswith("UserInfo/Record")][-1]
+    assert _body(record)["UserInfo"]["maxTimes"] == 3
+
+
+async def test_add_person_omits_usage_limit_when_not_set(hass: HomeAssistant, monkeypatch) -> None:
+    """Without a limit the field is left out, so firmware without it accepts the write."""
+
+    entry, captured = await _setup(hass, monkeypatch)
+    flow = await _flow(hass, entry)
+
+    result = await flow.async_step_add({"name": "Visitor", "user_type": "visitor"})
+    assert result["type"] == "create_entry"
+
+    record = [r for r in captured if r.url.path.endswith("UserInfo/Record")][-1]
+    assert "maxTimes" not in _body(record)["UserInfo"]
+
+
+async def test_edit_form_prefills_the_validity_window(hass: HomeAssistant, monkeypatch) -> None:
+    """The enabled validity window is shown with the dates already filled in."""
+
+    entry, _ = await _setup(hass, monkeypatch, users=[PERSON])
+    flow = await _flow(hass, entry)
+    await flow.async_step_edit({"employee_no": "1001"})
+    form = await flow.async_step_edit_form()
+
+    schema = form["data_schema"].schema
+    begin_key = next(k for k in schema if getattr(k, "schema", k) == "begin_time")
+    end_key = next(k for k in schema if getattr(k, "schema", k) == "end_time")
+    assert begin_key.default() == "2026-01-01T00:00:00"
+    assert end_key.default() == "2030-01-01T00:00:00"
+
+
+async def test_edit_form_leaves_validity_empty_when_disabled(hass: HomeAssistant, monkeypatch) -> None:
+    """A person without a validity window leaves both fields blank."""
+
+    person = {**PERSON, "Valid": {"enable": False}}
+    entry, _ = await _setup(hass, monkeypatch, users=[person])
+    flow = await _flow(hass, entry)
+    await flow.async_step_edit({"employee_no": "1001"})
+    form = await flow.async_step_edit_form()
+
+    schema = form["data_schema"].schema
+    begin_key = next(k for k in schema if getattr(k, "schema", k) == "begin_time")
+    end_key = next(k for k in schema if getattr(k, "schema", k) == "end_time")
+    assert begin_key.default is vol.UNDEFINED
+    assert end_key.default is vol.UNDEFINED
+
+
+async def test_edit_form_prefills_the_usage_limit(hass: HomeAssistant, monkeypatch) -> None:
+    """A device-reported maxTimes is shown in the usage-limit field."""
+
+    entry, _ = await _setup(hass, monkeypatch, users=[{**PERSON, "maxTimes": 5}])
+    flow = await _flow(hass, entry)
+    await flow.async_step_edit({"employee_no": "1001"})
+    form = await flow.async_step_edit_form()
+
+    schema = form["data_schema"].schema
+    limit_key = next(k for k in schema if getattr(k, "schema", k) == "max_times")
+    assert limit_key.default() == 5
 
 
 async def test_add_person_rejects_bad_validity(hass: HomeAssistant, monkeypatch) -> None:

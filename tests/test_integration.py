@@ -261,6 +261,44 @@ async def test_create_visitor_service_generates_pin(hass: HomeAssistant, monkeyp
     assert user["Valid"]["endTime"] == dt_util.as_local(end).strftime("%Y-%m-%dT%H:%M:%S")
 
 
+async def test_create_visitor_service_sends_the_usage_limit(hass: HomeAssistant, monkeypatch) -> None:
+    """A maximum number of uses on the visitor service is sent as maxTimes."""
+
+    entry, captured = await _setup(hass, monkeypatch)
+
+    begin = dt_util.parse_datetime("2026-10-01T09:00:00+03:00")
+    end = dt_util.parse_datetime("2026-10-01T21:00:00+03:00")
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_CREATE_VISITOR,
+        {"name": "Visitor Two", "begin_time": begin, "end_time": end, "max_times": 4},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    record = [r for r in captured if r.url.path.endswith("UserInfo/Record")][-1]
+    assert decoder(record)["UserInfo"]["maxTimes"] == 4
+
+
+async def test_create_visitor_service_omits_the_usage_limit(hass: HomeAssistant, monkeypatch) -> None:
+    """Without a limit the field is left out of the visitor record."""
+
+    entry, captured = await _setup(hass, monkeypatch)
+
+    begin = dt_util.parse_datetime("2026-10-01T09:00:00+03:00")
+    end = dt_util.parse_datetime("2026-10-01T21:00:00+03:00")
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_CREATE_VISITOR,
+        {"name": "Visitor Three", "begin_time": begin, "end_time": end},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    record = [r for r in captured if r.url.path.endswith("UserInfo/Record")][-1]
+    assert "maxTimes" not in decoder(record)["UserInfo"]
+
+
 async def test_delete_user_service(hass: HomeAssistant, monkeypatch) -> None:
     """The delete service sends the employee number."""
 

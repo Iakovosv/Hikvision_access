@@ -55,6 +55,16 @@ create_visitor:
       description: Optional card number to link to the visitor.
       selector:
         text:
+    max_times:
+      name: Maximum number of uses
+      description: >-
+        Optional limit on how many times the visitor credential may be used.
+        Leave it out for no limit.
+      selector:
+        number:
+          min: 1
+          max: 9999
+          mode: box
     door_no:
       name: Door number
       description: Door the visitor may open.
