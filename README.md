@@ -13,6 +13,9 @@ which covers NVRs and IP cameras. Install both if you have cameras and an access
   attributes for the name, employee number, card number, door and time
 - A `hikvision_access_event` event fired on the Home Assistant event bus for every granted access, so
   automations can react to who entered
+- Person management from the Home Assistant UI: open the integration's `Configure` button to
+  add, edit and delete people, set their PIN, gender, person type, validity window and card,
+  or open a door. No YAML required.
 - Services to manage visitors and doors:
   - `hikvision_access.create_visitor` — create a person with a validity window and a PIN
     (a random 6 digit PIN is generated when you omit it)
@@ -58,6 +61,20 @@ Copy `custom_components/hikvision_access` into your `config/custom_components` f
 Home Assistant.
 
 ## Usage
+
+### Managing people from the UI
+
+On `Settings / Devices & Services` find `Hikvision Access Control`, press `Configure` and choose:
+
+- `Add person` — employee ID, name, gender, person type, PIN, card and the validity window.
+  Leave the employee ID empty for an automatic one and the PIN empty for a random one.
+- `Edit person` — pick a person from the list. The form shows what the device currently holds
+  (type, gender, validity, cards, fingerprints and the visitor visit counters) and lets you
+  change it. Leave the PIN empty to keep the current one; fingerprints can only be enrolled
+  on the device itself.
+- `Delete person` — pick a person and confirm.
+- `Manage card` — add a card number, or leave it empty to remove the person's cards.
+- `Open door` — unlock a door once.
 
 React to an entry on the event bus:
 
