@@ -410,6 +410,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             "name": person.get("name") or "-",
             "user_type": person.get("userType") or "-",
             "gender": person.get("gender") or "-",
+            "pin": str(person.get("localPassword") or person.get("password") or "-"),
             "validity": validity,
             "cards": f"{person.get('numOfCard', 0)}",
             "fingerprints": f"{person.get('numOfFP', 0)}",
@@ -457,7 +458,8 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             schema[vol.Optional(ATTR_USER_TYPE, default=type_default)] = self._type_selector()
         else:
             schema[vol.Optional(ATTR_USER_TYPE, default="normal")] = self._type_selector()
-        schema[vol.Optional(ATTR_PIN)] = selector.TextSelector(
+        pin_default = str(defaults.get("localPassword") or defaults.get("password") or "")
+        schema[vol.Optional(ATTR_PIN, default=pin_default)] = selector.TextSelector(
             selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
         )
         schema[vol.Optional(ATTR_VALIDITY_ENABLED, default=validity_enabled)] = selector.BooleanSelector()

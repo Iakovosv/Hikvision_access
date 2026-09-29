@@ -299,6 +299,44 @@ async def test_get_person_falls_back_to_full_scan(hass: HomeAssistant, monkeypat
     assert person["employeeNo"] == "1001"
 
 
+async def test_edit_form_prefills_the_pin_from_the_device(hass: HomeAssistant, monkeypatch) -> None:
+    """The device returns the PIN as localPassword; the form shows it so it is not lost."""
+
+    entry, _ = await _setup(hass, monkeypatch, users=[{**PERSON, "localPassword": "0288"}])
+    flow = await _flow(hass, entry)
+    flow._employee_no = "1001"
+
+    async def _person(employee_no: str) -> dict:
+        return {**PERSON, "localPassword": "0288"}
+
+    monkeypatch.setattr(flow, "_load_person", _person)
+    form = await flow.async_step_edit_form()
+    schema = form["data_schema"].schema
+
+    pin_key = next(k for k in schema if getattr(k, "schema", k) == "pin")
+    assert pin_key.default() == "0288"
+    assert form["description_placeholders"]["pin"] == "0288"
+
+
+async def test_edit_form_pin_defaults_to_empty_when_device_hides_it(hass: HomeAssistant, monkeypatch) -> None:
+    """A device that does not return the PIN leaves the field empty, not broken."""
+
+    entry, _ = await _setup(hass, monkeypatch, users=[{**PERSON, "localPassword": ""}])
+    flow = await _flow(hass, entry)
+    flow._employee_no = "1001"
+
+    async def _person(employee_no: str) -> dict:
+        return {**PERSON, "localPassword": ""}
+
+    monkeypatch.setattr(flow, "_load_person", _person)
+    form = await flow.async_step_edit_form()
+    schema = form["data_schema"].schema
+
+    pin_key = next(k for k in schema if getattr(k, "schema", k) == "pin")
+    assert pin_key.default() == ""
+    assert form["description_placeholders"]["pin"] == "-"
+
+
 async def test_edit_form_prefills_door_from_person(hass: HomeAssistant, monkeypatch) -> None:
     """The door field defaults to the door the person already has rights to."""
 
