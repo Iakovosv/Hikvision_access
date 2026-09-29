@@ -116,6 +116,26 @@ person is never overwritten.
 The device rate limits failed logins, so authentication is negotiated once and reused.
 If the password is wrong, the integration backs off instead of retrying in a loop.
 
+## "Unauthorized" on the access event endpoint
+
+The device answers `401 Unauthorized` in more than one situation: a wrong password, a
+locked account, and an account that is signed in but missing a permission. The error
+message alone cannot tell them apart, so the integration checks which case applies.
+
+The account used by this integration needs the Remote: Parameters Settings and Remote:
+Log Search permissions. Without Log Search, `System/deviceInfo` succeeds (which is why
+the config flow accepts the credentials) while `AccessControl/AcsEvent` returns 401. If
+you see this, edit the user on the terminal and grant Remote: Log Search; do not change
+the password, it is already correct.
+
+Another case is the lockout that follows repeated failed logins. The device then returns
+401 for every request, including the ones that worked before, for about 30 minutes. Wait
+for it to expire; the integration will not keep trying and extend it.
+
+To see which endpoint the account may use, download the diagnostics from the integration
+page. The `probe` section reports `ok` or an error for both `System/deviceInfo` and
+`AccessControl/AcsEvent`; the host and credentials are redacted.
+
 If the terminal clock drifts more than a minute from Home Assistant, a warning is logged
 at startup. The device filters events by its own clock, so a large drift means entries
 happen but no event is returned. Enable NTP on the device to keep the clocks aligned.

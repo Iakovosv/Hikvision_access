@@ -29,19 +29,28 @@ def make_handler(
     users: list[dict[str, Any]] | None = None,
     page_size: int | None = None,
     device_time: str | None = None,
+    denied_paths: set[str] | None = None,
+    lockout_paths: set[str] | None = None,
 ):
     """Build a transport handler that mimics an access control terminal.
 
     `page_size` makes the event endpoint paginate like the real device does, and
     `users` answers the enrollment search used to pick a free employee number.
+    `denied_paths` answers 401 even after a valid login, the way ISAPI reports a
+    missing permission, and `lockout_paths` answers the 401 lockout body.
     """
 
     events = events if events is not None else []
     users = users if users is not None else []
+    denied_paths = denied_paths or set()
+    lockout_paths = lockout_paths or set()
 
     def handler(request: httpx.Request) -> httpx.Response:
         if captured is not None:
             captured.append(request)
+
+        path = request.url.path
+        suffix = path.rsplit("/ISAPI/", 1)[-1]
 
         if "Authorization" not in request.headers:
             return httpx.Response(
@@ -49,24 +58,42 @@ def make_handler(
                 headers={"WWW-Authenticate": 'Digest realm="DS-1", qop="auth", nonce="abc", opaque="xyz"'},
             )
 
-        path = request.url.path
-        if path.endswith("System/deviceInfo"):
+        # A lockout is answered before the permission check: the device refuses every
+        # request, including the ones that used to work.
+        if any(suffix.endswith(p) for p in lockout_paths):
+            return httpx.Response(
+                401,
+                text=(
+                    "<?xml version=\"1.0\"?><ResponseStatus><statusCode>4</statusCode>"
+                    "<statusString>Invalid Operation</statusString><lockStatus>locked</lockStatus>"
+                    "<unlockTime>1800</unlockTime></ResponseStatus>"
+                ),
+            )
+
+        # A missing permission is a 401 as well, with a normal digest challenge.
+        if any(suffix.endswith(p) for p in denied_paths):
+            return httpx.Response(
+                401,
+                headers={"WWW-Authenticate": 'Digest realm="DS-1", qop="auth", nonce="abc", opaque="xyz"'},
+            )
+
+        if suffix.endswith("System/deviceInfo"):
             return httpx.Response(200, json=DEVICE_INFO)
-        if path.endswith("System/capabilities"):
+        if suffix.endswith("System/capabilities"):
             return httpx.Response(200, json={"DeviceCap": {}})
-        if path.endswith("System/time"):
+        if suffix.endswith("System/time"):
             if device_time is None:
                 return httpx.Response(404, json={"statusCode": 4, "statusString": "Invalid Operation"})
             return httpx.Response(200, json={"Time": {"localTime": device_time, "timeZone": "CST-2:00:00"}})
-        if path.endswith("AccessControl/AcsEvent"):
+        if suffix.endswith("AccessControl/AcsEvent"):
             return httpx.Response(200, json={"AcsEvent": _event_page(request, events, page_size)})
-        if path.endswith("AccessControl/UserInfo/Search"):
+        if suffix.endswith("AccessControl/UserInfo/Search"):
             return httpx.Response(200, json={"UserInfoSearch": _user_page(request, users, page_size)})
-        if path.endswith("AccessControl/UserInfo/Record"):
+        if suffix.endswith("AccessControl/UserInfo/Record"):
             return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
-        if path.endswith("AccessControl/UserInfo/Delete"):
+        if suffix.endswith("AccessControl/UserInfo/Delete"):
             return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
-        if path.endswith("RemoteControl/door/1"):
+        if suffix.endswith("RemoteControl/door/1"):
             return httpx.Response(200, text="<ResponseStatus><statusCode>1</statusCode></ResponseStatus>")
         return httpx.Response(404, json={"statusCode": 4, "statusString": "Invalid Operation"})
 

@@ -121,3 +121,64 @@ def test_device_time_parsing() -> None:
     parsed = _parse_device_time("2026-05-05T08:00:00")
     assert parsed.tzinfo is not None
     assert parsed.hour == 8
+
+
+async def test_missing_permission_is_not_an_auth_failure() -> None:
+    """A 401 from a valid account is a permission problem, not a wrong password.
+
+    The device answers 401 both when the password is wrong and when the account may
+    not use an endpoint. After a successful login the second case must not be
+    reported as bad credentials, or the user is asked for the same correct password
+    forever.
+    """
+
+    from custom_components.hikvision_access.isapi import HikvisionAccessPermissionError
+
+    session = httpx.AsyncClient(
+        transport=httpx.MockTransport(make_handler(denied_paths={"AccessControl/AcsEvent"}))
+    )
+    client = HikvisionAccessClient(HOST, "admin", "secret", session=session)
+
+    # The identity is confirmed first; that is what makes the following 401 a permission error.
+    await client.get_device_info()
+
+    with pytest.raises(HikvisionAccessPermissionError):
+        await client.get_all_access_events(
+            dt.datetime(2026, 1, 1, 0, 0, 0), dt.datetime(2026, 1, 1, 1, 0, 0)
+        )
+
+
+async def test_wrong_password_is_an_auth_failure() -> None:
+    """A 401 when the identity cannot be confirmed stays a credential error."""
+
+    from custom_components.hikvision_access.isapi import HikvisionAccessAuthError
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            401,
+            headers={"WWW-Authenticate": 'Digest realm="DS-1", qop="auth", nonce="abc", opaque="xyz"'},
+        )
+
+    session = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = HikvisionAccessClient(HOST, "admin", "wrong", session=session)
+
+    with pytest.raises(HikvisionAccessAuthError):
+        await client.get_all_access_events(
+            dt.datetime(2026, 1, 1, 0, 0, 0), dt.datetime(2026, 1, 1, 1, 0, 0)
+        )
+
+
+async def test_lockout_is_reported_separately() -> None:
+    """The device's lockout body is not mistaken for a wrong password."""
+
+    from custom_components.hikvision_access.isapi import HikvisionAccessLockedError
+
+    session = httpx.AsyncClient(
+        transport=httpx.MockTransport(make_handler(lockout_paths={"AccessControl/AcsEvent"}))
+    )
+    client = HikvisionAccessClient(HOST, "admin", "secret", session=session)
+
+    with pytest.raises(HikvisionAccessLockedError):
+        await client.get_all_access_events(
+            dt.datetime(2026, 1, 1, 0, 0, 0), dt.datetime(2026, 1, 1, 1, 0, 0)
+        )
