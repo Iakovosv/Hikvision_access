@@ -3,8 +3,7 @@
 ## What this is
 
 `hikvision_access` is a Home Assistant custom integration for Hikvision access control
-terminals (door stations), talking to the device over ISAPI. It is the sibling of the
-`Iakovosv/Hikvision_next` integration, which covers cameras and NVRs. Reference device:
+terminals (door stations), talking to the device over ISAPI. Reference device:
 DS-K1T805MBFWX, firmware V1.9.1 build 240909.
 
 ## Build and test
@@ -32,8 +31,12 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
   entry. Everything about a person, including the card, lives in the edit form. Every device
   read is guarded: a 401 turns into an abort with a reason (`cannot_list`), never an
   exception out of the flow, because an uncaught error shows the user a bare "unknown error".
-- `sensor.py` — `last_access_time`, the who-entered-and-when timestamp sensor, and
-  `persons_enrolled`, the person count that does not depend on the event permission.
+- `sensor.py` — `last_access_time`, the who-entered-and-when timestamp sensor (its state
+  is a timestamp, so the UI shows it relatively; `date`, `time` and `datetime` attributes
+  carry the exact values), `last_access_person`, whose **state is the name** of the last
+  person (the binary sensor can only read `on`/`off` and HA labels those itself, so a name
+  cannot live there), and `persons_enrolled`, the person count that does not depend on the
+  event permission.
 - `button.py` — `open_door_N` per door, so a door is reachable from a dashboard, not only the
   gear menu, plus `refresh_people` to re-probe the device without a restart. Any user-facing
   capability must have an entity; the gear menu is not the only UI.
@@ -112,6 +115,10 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
   placeholders: Home Assistant shows the raw key (e.g. a bare `cannot_list`) when a
   translation is missing, and silently drops a localized string whose placeholders differ
   from the English one. `tests/test_translations.py` guards both, per language.
+- An optional entity field uses `OptionalEntitySelector` (`entity_selector.py`), not the
+  stock `EntitySelector`: the stock one rejects an empty string, so a settings page with
+  an untouched optional entity field fails to save with "Entity is neither a valid entity
+  ID nor a valid UUID" and writes nothing at all.
 - Never write `[%key:common::...%]` in this integration's translations. That syntax is expanded
   by `script.translations` while Core is built; a custom component is loaded from disk as-is, so
   the reference reaches the browser untouched and the UI shows it literally (this shipped for

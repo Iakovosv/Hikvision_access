@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.11
+
+- **The person who opened the door now has its own sensor.** The last-access binary
+  sensor can only report `on` or `off`; Home Assistant labels those states and does not
+  let a custom integration put a name in them. `sensor.last_access_person` carries the
+  name as its state (or the employee number when the device sends no name), so a device
+  page or a card reads who entered directly.
+- **The exact date and time are exposed.** `sensor.last_access_time` still holds the
+  timestamp, which the interface shows as a relative time ("9 hours ago"). It now also
+  carries `date`, `time` and `datetime` attributes with the precise values, alongside the
+  existing `name`, `employee_no`, `card_no`, `door_no`, `method` and `granted`.
+- **The last-access binary sensor no longer says only "Detected".** Its `on` and `off`
+  states have explicit, translated labels in English and Greek, so the device page reads
+  "Access detected" / "No access yet" instead of the bare default.
+- **Fixed the notifications settings page failing to save.** Leaving the notify service,
+  TTS entity or speaker empty and pressing Submit failed with "Entity is neither a valid
+  entity ID nor a valid UUID": the stock entity selector rejects an empty value, so the
+  options were never written even with announcements turned off. The three fields now
+  accept an empty selection.
+- The README no longer points to an unrelated integration, and documents the new sensor.
+
 ## 0.6.10
 
 - **The edit form now shows the dates you already set.** Turning on "Limit the validity

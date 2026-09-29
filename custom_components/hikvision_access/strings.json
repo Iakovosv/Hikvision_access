@@ -133,7 +133,11 @@
   "entity": {
     "binary_sensor": {
       "last_access": {
-        "name": "Last access"
+        "name": "Last access",
+        "state": {
+          "off": "No access yet",
+          "on": "Access detected"
+        }
       }
     },
     "button": {
@@ -147,6 +151,9 @@
     "sensor": {
       "last_access": {
         "name": "Last access time"
+      },
+      "last_access_person": {
+        "name": "Last person"
       },
       "persons_enrolled": {
         "name": "Persons enrolled"
