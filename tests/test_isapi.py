@@ -113,6 +113,86 @@ def test_isapi_time_format() -> None:
     assert _isapi_time(dt.datetime(2026, 5, 5, 8, 0, 0)) == "2026-05-05T08:00:00"
 
 
+def test_find_door_count_walks_the_capabilities_tree() -> None:
+    """The door count is found wherever the firmware nests it."""
+
+    from custom_components.hikvision_access.isapi import _find_door_count
+
+    assert _find_door_count({"AccessControl": {"Door": {"doorNumber": 2}}}) == 2
+    assert _find_door_count({"DeviceCap": [{"doorCount": "1"}]}) == 1
+    assert _find_door_count({"AccessControl": {"AcsEvent": {}}}) is None
+    assert _find_door_count({}) is None
+    assert _find_door_count({"x": {"numberOfDoors": 0}}) is None
+
+
+async def test_get_door_count_reads_the_count_endpoint() -> None:
+    """AccessControl/Door/Count is preferred when the firmware answers it."""
+
+    from custom_components.hikvision_access.isapi import HikvisionAccessClient
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "Authorization" not in request.headers:
+            return httpx.Response(
+                401,
+                headers={"WWW-Authenticate": 'Digest realm="DS-1", qop="auth", nonce="abc", opaque="xyz"'},
+            )
+        if request.url.path.endswith("AccessControl/Door/Count"):
+            return httpx.Response(200, json={"DoorCount": {"doorNumber": "2"}})
+        return httpx.Response(404, json={"statusCode": 4})
+
+    session = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = HikvisionAccessClient(
+        host="http://192.0.2.10", username="admin", password="secret", session=session
+    )
+    assert await client.get_door_count() == 2
+
+
+async def test_get_door_count_falls_back_to_capabilities() -> None:
+    """When the count endpoint is absent the capabilities tree is used."""
+
+    from custom_components.hikvision_access.isapi import HikvisionAccessClient
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "Authorization" not in request.headers:
+            return httpx.Response(
+                401,
+                headers={"WWW-Authenticate": 'Digest realm="DS-1", qop="auth", nonce="abc", opaque="xyz"'},
+            )
+        if request.url.path.endswith("AccessControl/Door/Count"):
+            return httpx.Response(404, json={"statusCode": 4})
+        if request.url.path.endswith("System/capabilities"):
+            return httpx.Response(200, json={"DeviceCap": {"AccessControl": {"doorNumber": 4}}})
+        return httpx.Response(404, json={"statusCode": 4})
+
+    session = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = HikvisionAccessClient(
+        host="http://192.0.2.10", username="admin", password="secret", session=session
+    )
+    assert await client.get_door_count() == 4
+
+
+async def test_get_door_count_returns_none_when_unknown() -> None:
+    """A device that will not say how many doors it has returns None, not a guess."""
+
+    from custom_components.hikvision_access.isapi import HikvisionAccessClient
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "Authorization" not in request.headers:
+            return httpx.Response(
+                401,
+                headers={"WWW-Authenticate": 'Digest realm="DS-1", qop="auth", nonce="abc", opaque="xyz"'},
+            )
+        if request.url.path.endswith("System/capabilities"):
+            return httpx.Response(200, json={"DeviceCap": {}})
+        return httpx.Response(404, json={"statusCode": 4})
+
+    session = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = HikvisionAccessClient(
+        host="http://192.0.2.10", username="admin", password="secret", session=session
+    )
+    assert await client.get_door_count() is None
+
+
 def test_device_time_parsing() -> None:
     """The device clock is parsed as local time."""
 

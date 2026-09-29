@@ -46,6 +46,7 @@ async def async_get_config_entry_diagnostics(
         },
         "last_update_success": coordinator.last_update_success,
         "event_access_denied": coordinator.event_access_denied,
+        "door_numbers": coordinator.door_numbers,
         "last_exception": type(coordinator.last_exception).__name__ if coordinator.last_exception else None,
         "probe": await _probe_endpoints(hass, entry, client=client),
     }

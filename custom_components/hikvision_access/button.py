@@ -16,20 +16,18 @@ from .isapi import HikvisionAccessError
 
 _LOGGER = logging.getLogger(__name__)
 
-#: Doors offered as buttons. Most terminals have one or two; four covers the models
-#: with more and the numbers beyond what the device has simply fail on the device.
-DOOR_NUMBERS = (1, 2)
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Add one button per door."""
+    """Add one button per door the terminal reports."""
 
     coordinator: HikvisionAccessCoordinator = entry.runtime_data
-    async_add_entities(OpenDoorButton(coordinator, door) for door in DOOR_NUMBERS)
+    async_add_entities(
+        OpenDoorButton(coordinator, door) for door in coordinator.door_numbers
+    )
 
 
 class OpenDoorButton(HikvisionAccessEntity, ButtonEntity):

@@ -103,7 +103,7 @@
       "not_loaded": "The device is not set up. Fix the setup error on the integration page first.",
       "no_persons": "No persons are enrolled on the terminal.",
       "delete_cancelled": "Deletion cancelled.",
-      "cannot_list": "The device did not return the person list. Check that the account may read Remote: Parameters Settings, then try again."
+      "cannot_list": "The device did not return the person list, so it cannot be changed.\n\nAnswer from the device: {error}\n\nThis is usually a missing permission. On the terminal, give the Home Assistant account Remote: Parameters Settings."
     }
   },
   "entity": {
