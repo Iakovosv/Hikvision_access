@@ -31,6 +31,7 @@ def make_handler(
     device_time: str | None = None,
     denied_paths: set[str] | None = None,
     lockout_paths: set[str] | None = None,
+    error_paths: set[str] | None = None,
 ):
     """Build a transport handler that mimics an access control terminal.
 
@@ -38,12 +39,14 @@ def make_handler(
     `users` answers the enrollment search used to pick a free employee number.
     `denied_paths` answers 401 even after a valid login, the way ISAPI reports a
     missing permission, and `lockout_paths` answers the 401 lockout body.
+    `error_paths` answers 500, which makes setup fail as a transport error.
     """
 
     events = events if events is not None else []
     users = users if users is not None else []
     denied_paths = denied_paths or set()
     lockout_paths = lockout_paths or set()
+    error_paths = error_paths or set()
 
     def handler(request: httpx.Request) -> httpx.Response:
         if captured is not None:
@@ -76,6 +79,10 @@ def make_handler(
                 401,
                 headers={"WWW-Authenticate": 'Digest realm="DS-1", qop="auth", nonce="abc", opaque="xyz"'},
             )
+
+        # A transport failure, used to check that setup retries instead of loading.
+        if any(suffix.endswith(p) for p in error_paths):
+            return httpx.Response(500, text="internal error")
 
         if suffix.endswith("System/deviceInfo"):
             return httpx.Response(200, json=DEVICE_INFO)

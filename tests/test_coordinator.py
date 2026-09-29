@@ -86,19 +86,21 @@ def _coordinator_with(hass, **kwargs) -> HikvisionAccessCoordinator:
 
 
 async def test_permission_error_is_not_a_reauth(hass) -> None:
-    """A 401 from an authenticated account keeps the entry loaded.
+    """A 401 from an authenticated account keeps the entry loaded and quiet.
 
     Asking for a new password would loop forever with the correct one, so a missing
-    permission becomes an update failure instead of an authentication failure.
+    permission does not raise a reauth, and it does not log an ERROR on every poll
+    either: the flag and the slower interval carry the state instead.
     """
-
-    from homeassistant.helpers.update_coordinator import UpdateFailed
 
     coordinator = _coordinator_with(hass, denied_paths={"AccessControl/AcsEvent"})
     await coordinator.client.get_device_info()
 
-    with pytest.raises(UpdateFailed):
-        await coordinator._async_update_data()
+    data = await coordinator._async_update_data()
+
+    assert coordinator.event_access_denied is True
+    assert coordinator.update_interval.total_seconds() == 300
+    assert data == {}
 
 
 async def test_lockout_is_an_update_failure(hass) -> None:

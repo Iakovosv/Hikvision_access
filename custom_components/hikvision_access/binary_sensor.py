@@ -47,8 +47,24 @@ class LastAccessSensor(HikvisionAccessEntity, CoordinatorEntity, BinarySensorEnt
         return self.coordinator.is_entry_granted
 
     @property
+    def available(self) -> bool:
+        """Whether the coordinator has data and may read events.
+
+        When the account cannot read access events there is nothing this sensor can show,
+        so it reports unavailable instead of a permanent off, which would look like an
+        idle door.
+        """
+
+        if self.coordinator.event_access_denied:
+            return False
+        return super().available
+
+    @property
     def extra_state_attributes(self) -> dict:
         """Expose who last authenticated."""
+
+        if self.coordinator.event_access_denied:
+            return {"reason": "The device account may not read access events"}
 
         event = self.coordinator.last_event
         if event is None:

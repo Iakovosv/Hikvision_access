@@ -18,6 +18,10 @@ ACS_EVENT_INITIAL_LOOKBACK_SECONDS: Final = 3600
 # Poll interval. The device does not push events over a plain HTTP connection.
 POLL_INTERVAL_SECONDS: Final = 30
 
+# While event access is denied the poll slows down instead of stopping, so the
+# entry recovers on its own once the permission is granted.
+POLL_INTERVAL_DEGRADED_SECONDS: Final = 300
+
 # A single access can appear in two consecutive windows; ignore repeats inside this period.
 EVENT_DEDUP_WINDOW_SECONDS: Final = 60
 
