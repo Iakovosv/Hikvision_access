@@ -11,11 +11,16 @@ which covers NVRs and IP cameras. Install both if you have cameras and an access
 - Discover the terminal by host, username and password, over HTTP with digest or basic auth
 - A `binary_sensor.last_access` entity that turns on when someone authenticates, with
   attributes for the name, employee number, card number, door and time
+- A `sensor.last_access_time` timestamp entity showing when someone last authenticated, with
+  the name, employee number, card number and door as attributes. This is the "who entered and
+  when" entity for a dashboard card.
+- One `button.open_door_N` per door, so a door can be unlocked from a dashboard or an
+  automation, not only from the gear menu
 - A `hikvision_access_event` event fired on the Home Assistant event bus for every granted access, so
   automations can react to who entered
 - Person management from the Home Assistant UI: open the integration's `Configure` button to
-  add, edit and delete people, set their PIN, gender, person type, validity window and card,
-  or open a door. No YAML required.
+  add, edit and delete people. Everything about a person lives in one form: name, gender,
+  person type, PIN, validity window, door and card. No YAML required.
 - Services to manage visitors and doors:
   - `hikvision_access.create_visitor` — create a person with a validity window and a PIN
     (a random 6 digit PIN is generated when you omit it)
@@ -70,11 +75,18 @@ On `Settings / Devices & Services` find `Hikvision Access Control`, press `Confi
   Leave the employee ID empty for an automatic one and the PIN empty for a random one.
 - `Edit person` — pick a person from the list. The form shows what the device currently holds
   (type, gender, validity, cards, fingerprints and the visitor visit counters) and lets you
-  change it. Leave the PIN empty to keep the current one; fingerprints can only be enrolled
-  on the device itself.
+  change everything in one place: name, PIN, validity, door and card. The card field is
+  prefilled with the card the person already holds, so submitting the form untouched changes
+  nothing; type a new number to replace the card. Leave the PIN empty to keep the current one.
+  Fingerprints can only be enrolled on the device itself.
 - `Delete person` — pick a person and confirm.
-- `Manage card` — add a card number, or leave it empty to remove the person's cards.
-- `Open door` — unlock a door once.
+- `Open door` — unlock a door once. The same is available as a `button.open_door_N` entity on
+  the device page.
+
+A note on permissions: person management needs `Remote: Parameters Settings`. If the account
+cannot read the person list, the menu says so instead of failing. Access events need
+`Remote: Log Search`; when that is missing the entry still works and only the last-access
+entities report the reason.
 
 React to an entry on the event bus:
 

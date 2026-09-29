@@ -44,11 +44,19 @@ _LOGGER = logging.getLogger(__name__)
 MENU_ADD = "add"
 MENU_EDIT = "edit"
 MENU_DELETE = "delete"
-MENU_CARDS = "cards"
 MENU_OPEN_DOOR = "open_door"
 
 # A generated PIN is six digits; the device accepts four to eight.
 GENERATED_PIN_DIGITS = 6
+
+
+def _door_number(value: Any, default: int = 1) -> int:
+    """Coerce a door number, falling back to the default instead of raising."""
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _person_label(person: dict[str, Any]) -> str:
@@ -78,13 +86,22 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             )
         return coordinator.client
 
-    async def _async_persons(self) -> list[dict[str, Any]]:
-        """Return every person enrolled on the device, following pagination."""
+    async def _async_persons(self) -> list[dict[str, Any]] | None:
+        """Return every person enrolled on the device, or None when it cannot be read.
+
+        A device whose account may not read the enrolment list answers 401. Returning None
+        lets each step explain that instead of raising out of the flow, which would show
+        the user a bare "unknown error".
+        """
 
         persons: list[dict[str, Any]] = []
         position = 0
         while True:
-            body = await self._client.get_users(position=position, max_results=100)
+            try:
+                body = await self._client.get_users(position=position, max_results=100)
+            except HikvisionAccessError as ex:
+                _LOGGER.error("Could not read the persons from the device: %s", ex)
+                return None
             info = body.get("UserInfoSearch", {})
             page = info.get("UserInfo") or []
             if isinstance(page, dict):
@@ -95,6 +112,15 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             position += len(page)
         return persons
 
+    async def _load_person(self, employee_no: str) -> dict[str, Any] | None:
+        """Return one person, or None when the device cannot be asked."""
+
+        try:
+            return await self._client.get_person(employee_no)
+        except HikvisionAccessError as ex:
+            _LOGGER.error("Could not read person %s from the device: %s", employee_no, ex)
+            return None
+
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         """Show the person management menu."""
 
@@ -103,7 +129,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
 
         return self.async_show_menu(
             step_id="init",
-            menu_options=[MENU_ADD, MENU_EDIT, MENU_DELETE, MENU_CARDS, MENU_OPEN_DOOR],
+            menu_options=[MENU_ADD, MENU_EDIT, MENU_DELETE, MENU_OPEN_DOOR],
         )
 
     async def async_step_add(self, user_input: dict[str, Any] | None = None):
@@ -135,6 +161,8 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             return await self.async_step_edit_form()
 
         persons = await self._async_persons()
+        if persons is None:
+            return self.async_abort(reason="cannot_list")
         if not persons:
             return self.async_abort(reason="no_persons")
 
@@ -146,20 +174,23 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
         )
 
     async def async_step_edit_form(self, user_input: dict[str, Any] | None = None):
-        """Edit the chosen person, prefilled with what the device currently holds."""
+        """Edit the chosen person, including the card, prefilled from the device."""
 
         employee_no = self._employee_no
         if employee_no is None:  # pragma: no cover - only reachable out of order
             return await self.async_step_edit()
 
-        person = await self._client.get_person(employee_no)
+        person = await self._load_person(employee_no)
         if person is None:
-            return self.async_abort(reason="person_gone")
+            return self.async_abort(reason="cannot_list")
 
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
                 await self._modify(employee_no, user_input)
+                await self._sync_card(employee_no, person, user_input)
+            except HomeAssistantError as ex:
+                errors["base"] = str(ex)
             except HikvisionAccessError as ex:
                 errors["base"] = "device_error"
                 _LOGGER.error("Could not update the person: %s", ex)
@@ -168,7 +199,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
 
         return self.async_show_form(
             step_id="edit_form",
-            data_schema=self._person_schema(defaults=person),
+            data_schema=self._person_schema(defaults=person, include_card=True),
             description_placeholders=self._person_summary(person),
             errors=errors,
         )
@@ -181,6 +212,8 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             return await self.async_step_delete_confirm()
 
         persons = await self._async_persons()
+        if persons is None:
+            return self.async_abort(reason="cannot_list")
         if not persons:
             return self.async_abort(reason="no_persons")
 
@@ -218,71 +251,13 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             description_placeholders={"employee_no": employee_no},
         )
 
-    async def async_step_cards(self, user_input: dict[str, Any] | None = None):
-        """Assign or remove the card of a person."""
-
-        if user_input is not None:
-            self._employee_no = user_input[ATTR_EMPLOYEE_NO]
-            return await self.async_step_card_form()
-
-        persons = await self._async_persons()
-        if not persons:
-            return self.async_abort(reason="no_persons")
-
-        return self.async_show_form(
-            step_id="cards",
-            data_schema=vol.Schema(
-                {vol.Required(ATTR_EMPLOYEE_NO): self._person_selector(persons)}
-            ),
-        )
-
-    async def async_step_card_form(self, user_input: dict[str, Any] | None = None):
-        """Add a card number, or clear it when the field is left empty."""
-
-        employee_no = self._employee_no
-        if employee_no is None:  # pragma: no cover - only reachable out of order
-            return await self.async_step_cards()
-
-        person = await self._client.get_person(employee_no)
-        if person is None:
-            return self.async_abort(reason="person_gone")
-
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            card_no = (user_input.get(ATTR_CARD_NO) or "").strip()
-            try:
-                if card_no:
-                    await self._client.set_card(employee_no, card_no)
-                else:
-                    await self._clear_cards(person)
-            except HikvisionAccessError as ex:
-                errors["base"] = "device_error"
-                _LOGGER.error("Could not change the card: %s", ex)
-            else:
-                return self.async_create_entry(title="", data={})
-
-        current = self._current_cards(person)
-        return self.async_show_form(
-            step_id="card_form",
-            data_schema=vol.Schema(
-                {vol.Optional(ATTR_CARD_NO): selector.TextSelector()}
-            ),
-            description_placeholders={"cards": current or "-"},
-            errors=errors,
-        )
-
     async def async_step_open_door(self, user_input: dict[str, Any] | None = None):
         """Unlock a door once."""
 
         if user_input is not None:
             try:
-                door_no = int(user_input[ATTR_DOOR_NO])
-                await self._client.request(
-                    "PUT",
-                    f"AccessControl/RemoteControl/door/{door_no}",
-                    data="<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>",
-                    headers={"Content-Type": "application/xml"},
-                )
+                door_no = _door_number(user_input.get(ATTR_DOOR_NO))
+                await self._client.open_door(door_no)
             except HikvisionAccessError as ex:
                 _LOGGER.error("Could not open the door: %s", ex)
                 return self.async_show_form(
@@ -312,7 +287,7 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             begin_time=begin,
             end_time=end,
             pin=pin,
-            door_no=int(user_input.get(ATTR_DOOR_NO, 1)),
+            door_no=_door_number(user_input.get(ATTR_DOOR_NO)),
             gender=user_input.get(ATTR_GENDER),
             user_type=user_input.get(ATTR_USER_TYPE, "normal"),
             card_no=(user_input.get(ATTR_CARD_NO) or "").strip() or None,
@@ -328,18 +303,40 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
             begin_time=begin,
             end_time=end,
             pin=(user_input.get(ATTR_PIN) or "").strip() or None,
-            door_no=int(user_input.get(ATTR_DOOR_NO, 1)),
+            door_no=_door_number(user_input.get(ATTR_DOOR_NO)),
             gender=user_input.get(ATTR_GENDER),
             user_type=user_input.get(ATTR_USER_TYPE, "normal"),
         )
+
+    async def _sync_card(
+        self, employee_no: str, person: dict[str, Any], user_input: dict[str, Any]
+    ) -> None:
+        """Apply the card field from the edit form, which holds one card number.
+
+        An empty field means "keep the current card", so editing a person never silently
+        removes a card. A filled field replaces the card the person holds.
+        """
+
+        card_no = (user_input.get(ATTR_CARD_NO) or "").strip()
+        current = self._card_numbers(person)
+        if not card_no:
+            return
+        if card_no in current:
+            return
+        await self._clear_cards(person)
+        await self._client.set_card(employee_no, card_no)
 
     def _validity(self, user_input: dict[str, Any]) -> tuple[Any, Any]:
         """Return the validity window, or (None, None) when it is not enabled."""
 
         if not user_input.get(ATTR_VALIDITY_ENABLED):
             return None, None
-        begin = dt_util.as_local(cv.datetime(user_input[ATTR_BEGIN_TIME]))
-        end = dt_util.as_local(cv.datetime(user_input[ATTR_END_TIME]))
+        begin_raw = user_input.get(ATTR_BEGIN_TIME)
+        end_raw = user_input.get(ATTR_END_TIME)
+        if not begin_raw or not end_raw:
+            raise HomeAssistantError("invalid_validity")
+        begin = dt_util.as_local(cv.datetime(begin_raw))
+        end = dt_util.as_local(cv.datetime(end_raw))
         if end <= begin:
             raise HomeAssistantError("invalid_validity")
         return begin, end
@@ -436,7 +433,13 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
         schema[vol.Optional(ATTR_BEGIN_TIME)] = selector.DateTimeSelector()
         schema[vol.Optional(ATTR_END_TIME)] = selector.DateTimeSelector()
         if include_card:
-            schema[vol.Optional(ATTR_CARD_NO)] = selector.TextSelector()
+            # On edit the field shows the card the person already holds; on add it starts
+            # empty. Submitting the shown card again is a no-op.
+            current_card = ""
+            if defaults:
+                cards = HikvisionAccessOptionsFlow._card_numbers(defaults)
+                current_card = cards[0] if cards else ""
+            schema[vol.Optional(ATTR_CARD_NO, default=current_card)] = selector.TextSelector()
         schema[vol.Optional(ATTR_DOOR_NO, default=self._door_default(defaults))] = selector.NumberSelector(
             selector.NumberSelectorConfig(min=1, max=4, mode=selector.NumberSelectorMode.BOX)
         )
@@ -506,7 +509,8 @@ class HikvisionAccessOptionsFlow(OptionsFlow):
     async def _next_employee_no(self) -> str:
         """Allocate a free employee number, keeping visitors away from staff numbers."""
 
-        existing = {str(person.get("employeeNo")) for person in await self._async_persons()}
+        persons = await self._async_persons() or []
+        existing = {str(person.get("employeeNo")) for person in persons}
         number = 900001
         while str(number) in existing:
             number += 1
