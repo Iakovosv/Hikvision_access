@@ -55,6 +55,7 @@ ATTR_USER_TYPE: Final = "user_type"
 ATTR_CARD_NO: Final = "card_no"
 ATTR_VALIDITY_ENABLED: Final = "validity_enabled"
 ATTR_AUTO_PIN: Final = "auto_pin"
+ATTR_MAX_TIMES: Final = "max_times"
 
 GENDERS: Final = ("male", "female", "unknown")
 USER_TYPES: Final = ("normal", "visitor")
@@ -65,7 +66,7 @@ VISITOR_USER_TYPES: Final = ("visitor",)
 # Keys a device may use for the visitor "visit times" counters. The device the
 # integration was modelled on does not return them over ISAPI, so the value is read
 # back by name when present and never written blindly under a guessed name.
-VISIT_TIMES_TOTAL_KEYS: Final = ("visitTimes", "maxVisitTimes", "maxVisitCount")
+VISIT_TIMES_TOTAL_KEYS: Final = ("maxTimes", "visitTimes", "maxVisitTimes", "maxVisitCount")
 VISIT_TIMES_USED_KEYS: Final = ("currentVisitTimes", "visitTimesUsed", "usedVisitTimes")
 VISIT_TIMES_REMAINING_KEYS: Final = ("remainingVisitTimes", "leftVisitTimes")
 

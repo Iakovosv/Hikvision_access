@@ -412,6 +412,7 @@ class HikvisionAccessClient:
         gender: str | None = None,
         user_type: str = "normal",
         card_no: str | None = None,
+        max_times: int | None = None,
     ) -> dict[str, Any]:
         """Create or replace a person, optionally with a PIN, a card and a validity window."""
 
@@ -424,6 +425,7 @@ class HikvisionAccessClient:
             door_no=door_no,
             gender=gender,
             user_type=user_type,
+            max_times=max_times,
         )
 
         result = await self._write(
@@ -448,6 +450,7 @@ class HikvisionAccessClient:
         door_no: int = 1,
         gender: str | None = None,
         user_type: str = "normal",
+        max_times: int | None = None,
     ) -> dict[str, Any]:
         """Update an existing person without dropping its cards or fingerprints.
 
@@ -464,6 +467,7 @@ class HikvisionAccessClient:
             door_no=door_no,
             gender=gender,
             user_type=user_type,
+            max_times=max_times,
         )
         return await self._write(
             ("PUT", "POST"),
@@ -482,6 +486,7 @@ class HikvisionAccessClient:
         door_no: int,
         gender: str | None,
         user_type: str,
+        max_times: int | None = None,
     ) -> dict[str, Any]:
         """Build the UserInfo body shared by create and modify."""
 
@@ -504,6 +509,11 @@ class HikvisionAccessClient:
                 "endTime": _isapi_time(end_time),
                 "timeType": "local",
             }
+        # How many times the credential may be used. Only sent when the user asked for a
+        # limit: firmware that predates the field refuses the whole write when it is
+        # present, and a device that supports it reads 0 as "no entry allowed".
+        if max_times is not None:
+            user_info["maxTimes"] = int(max_times)
         return user_info
 
     async def get_person(self, employee_no: str) -> dict[str, Any] | None:
