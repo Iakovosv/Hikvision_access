@@ -2,6 +2,11 @@
 
 ## 0.6.12
 
+- **A refused door command is no longer reported as success.** A terminal can answer a
+  door command with HTTP 200 and still refuse it, using its own `statusCode` (4 for a door
+  with no relay, or a command the model does not accept). Only the HTTP status was read, so
+  such a refusal was indistinguishable from a door that opened. The device's status code is
+  now read, and a refusal is raised with the message the device gave.
 - **The door command can be sent from Windows.** `scripts/open-door.ps1` opens a door
   through the integration's own service, printing the exact request first and reading the
   door status back from the terminal afterwards. `-DryRun` stops after printing.

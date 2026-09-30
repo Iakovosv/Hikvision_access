@@ -503,6 +503,63 @@ async def test_open_door_rejects_an_unknown_command(client: HikvisionAccessClien
         await client.open_door(1, command="unlock")
 
 
+async def test_open_door_reports_the_status_the_device_returned() -> None:
+    """An accepted command carries the device's own status code back to the caller."""
+
+    captured: list[httpx.Request] = []
+    session = httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            make_handler(
+                captured=captured,
+                door_reply=(
+                    '<?xml version="1.0" encoding="UTF-8"?>'
+                    '<ResponseStatus version="2.0">'
+                    "<statusCode>1</statusCode>"
+                    "<statusString>OK</statusString>"
+                    "<subStatusCode>ok</subStatusCode>"
+                    "</ResponseStatus>"
+                ),
+            )
+        )
+    )
+    client = HikvisionAccessClient(HOST, "admin", "secret", session=session)
+
+    result = await client.open_door(1)
+
+    assert result["sent"] is True
+    assert result["status_code"] == 1
+    assert result["status_string"] == "OK"
+
+
+async def test_open_door_raises_when_the_device_refuses_the_command() -> None:
+    """HTTP 200 with a failing statusCode is a refusal, not a door that opened.
+
+    A door with no relay, or a command the model does not accept, is answered this way.
+    Reporting it as success would tell an automation the door opened when it did not.
+    """
+
+    session = httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            make_handler(
+                door_reply=(
+                    '<?xml version="1.0" encoding="UTF-8"?>'
+                    '<ResponseStatus version="2.0">'
+                    "<statusCode>4</statusCode>"
+                    "<statusString>Invalid Operation</statusString>"
+                    "</ResponseStatus>"
+                ),
+            )
+        )
+    )
+    client = HikvisionAccessClient(HOST, "admin", "secret", session=session)
+
+    with pytest.raises(HikvisionAccessError) as excinfo:
+        await client.open_door(1)
+
+    assert "Invalid Operation" in str(excinfo.value)
+    assert "statusCode 4" in str(excinfo.value)
+
+
 async def test_door_capabilities_report_doors_and_commands(client: HikvisionAccessClient) -> None:
     """The read-only capability GET answers which doors and commands are supported."""
 

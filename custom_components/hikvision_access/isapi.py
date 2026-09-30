@@ -666,12 +666,13 @@ class HikvisionAccessClient:
             )
             return {"dry_run": True, "method": "PUT", "path": path, "body": body}
 
-        return await self.request(
+        response = await self.request(
             "PUT",
             path,
             data=body,
             headers={"Content-Type": "application/xml"},
         )
+        return _door_command_result(response, path=path, body=body)
 
     def event_picture_url(self, event_id: str) -> str:
         """Return the URL of the snapshot attached to an access event."""
@@ -749,6 +750,51 @@ def _as_positive_int(value: Any) -> int | None:
     except (TypeError, ValueError):
         return None
     return count if count > 0 else None
+
+
+def _door_command_result(response: Any, *, path: str, body: str) -> dict[str, Any]:
+    """Read a door command reply and refuse to call a rejection a success.
+
+    A terminal answers an accepted command with HTTP 200 and
+
+        <ResponseStatus>
+          <statusCode>1</statusCode>
+          <statusString>OK</statusString>
+        </ResponseStatus>
+
+    but it can also answer HTTP 200 with a failure such as
+
+        <statusCode>4</statusCode>
+        <statusString>Invalid Operation</statusString>
+
+    for a door with no relay, or a command the model does not accept. A bare HTTP 200
+    would report those as a door that opened, so the device's own status code is read
+    and a non-zero one is raised, carrying the message the device gave.
+    """
+
+    raw = response.get("raw") if isinstance(response, dict) else None
+    if not raw:
+        return {"sent": True, "method": "PUT", "path": path, "body": body, "status_code": None}
+
+    code_match = re.search(r"<statusCode>\s*(-?\d+)\s*</statusCode>", raw)
+    code = int(code_match.group(1)) if code_match else None
+    message_match = re.search(r"<statusString>([^<]*)</statusString>", raw)
+    message = message_match.group(1).strip() if message_match else ""
+
+    if code not in (None, 0, 1):
+        raise HikvisionAccessError(
+            f"The terminal refused the door command for {path}: {message or 'no message'} "
+            f"(statusCode {code})"
+        )
+
+    return {
+        "sent": True,
+        "method": "PUT",
+        "path": path,
+        "body": body,
+        "status_code": code,
+        "status_string": message,
+    }
 
 
 def _parse_door_capabilities(raw: str) -> dict[str, Any]:
