@@ -45,9 +45,21 @@ Write-Host ("Entry {0}  state={1}" -f $entry.entry_id, $entry.state)
 Write-Host "`n=== 2. Diagnostics: what would be sent ===" -ForegroundColor Cyan
 $diag = Invoke-RestMethod -Uri "$HaUrl/api/diagnostics/config_entry/$($entry.entry_id)" -Headers $headers -Method Get
 
+$hasDoorControl = $null -ne $diag.data.PSObject.Properties['door_control']
+$hasDoorCommands = $null -ne $diag.data.PSObject.Properties['door_commands']
+
 Write-Host ("Device: {0} {1}" -f $diag.data.device.model, $diag.data.device.firmware)
 Write-Host ("Doors reported: {0}" -f ($diag.data.door_numbers -join ', '))
 Write-Host ("Last update ok: {0}" -f $diag.data.last_update_success)
+
+if (-not $hasDoorControl) {
+    Write-Host "`nThe integration on this Home Assistant is older than 0.6.12, so it does not" -ForegroundColor Red
+    Write-Host "report the door capability or the command it would send." -ForegroundColor Red
+    Write-Host "Update the integration, then run this again. Meanwhile you can ask the device" -ForegroundColor Yellow
+    Write-Host "directly, with no integration involved:" -ForegroundColor Yellow
+    Write-Host "  curl.exe --digest -u admin:YOUR_PASSWORD `"http://<device-ip>/ISAPI/AccessControl/RemoteControl/door/capabilities`"" -ForegroundColor Yellow
+    exit 2
+}
 
 Write-Host "`nDoor control support, read from the device (read-only):" -ForegroundColor Yellow
 if ($diag.data.door_control.supported) {
@@ -63,11 +75,13 @@ if ($diag.data.door_control.supported) {
     Write-Host "  An error here means the account may lack door-control permission." -ForegroundColor Yellow
 }
 
-Write-Host "`nDoor commands that WOULD be sent (nothing is sent by reading this):" -ForegroundColor Yellow
-$diag.data.door_commands.PSObject.Properties | ForEach-Object {
-    $c = $_.Value
-    Write-Host ("  {0}: {1} /ISAPI/{2}" -f $_.Name, $c.method, $c.path)
-    Write-Host ("      body: {0}" -f $c.body)
+if ($hasDoorCommands) {
+    Write-Host "`nDoor commands that WOULD be sent (nothing is sent by reading this):" -ForegroundColor Yellow
+    $diag.data.door_commands.PSObject.Properties | ForEach-Object {
+        $c = $_.Value
+        Write-Host ("  {0}: {1} /ISAPI/{2}" -f $_.Name, $c.method, $c.path)
+        Write-Host ("      body: {0}" -f $c.body)
+    }
 }
 
 Write-Host "`n=== 3. dry_run: build the command, send nothing ===" -ForegroundColor Cyan
