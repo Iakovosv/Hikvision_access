@@ -554,6 +554,9 @@ async def test_diagnostics_show_the_door_command_without_sending_it(
     assert diagnostics["door_control"]["supported"] is True
     assert diagnostics["door_control"]["doors"] == [1, 2]
     assert "open" in diagnostics["door_control"]["commands"]
+    # The work status is read-only too, and reports the lock and magnet per door.
+    assert diagnostics["door_status"]["supported"] is True
+    assert diagnostics["door_status"]["doors"][0] == {"door_no": 1, "locked": True, "magnet_open": False}
 
 
 async def test_diagnostics_probe_when_setup_failed(hass: HomeAssistant, monkeypatch) -> None:

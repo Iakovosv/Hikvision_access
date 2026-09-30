@@ -3,12 +3,14 @@
 ## 0.6.12
 
 - **You can check the door command without opening the door.** A terminal answers a door
-  command only by unlocking, so there is no way to test it. Three ways around that: the
+  command only by unlocking, so there is no way to test it. Four ways around that: the
   diagnostics now carry a `door_control` section, read from the terminal's read-only door
   capability endpoint, which names the doors it can control and the commands it accepts
-  (`open` included); a `door_commands` section with the exact method, path and body that
-  would be sent for each door; and `hikvision_access.open_door` takes a `dry_run` option
-  that builds and logs the request without sending it. None of the three touches a door.
+  (`open` included); a `door_status` section, read from the read-only work status, with the
+  lock and magnet state per door, where the magnet is the physical door and so answers
+  whether a door really opened; a `door_commands` section with the exact method, path and
+  body that would be sent for each door; and `hikvision_access.open_door` takes a `dry_run`
+  option that builds and logs the request without sending it. None of the four touches a door.
 - **The door command is built in one place.** The button, the service and the Configure
   menu each used to spell out the path themselves, which is how a door number drifts. They
   now share `door_command_path` and `door_command_body`.

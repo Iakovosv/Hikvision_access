@@ -153,6 +153,27 @@ door_commands:
     body: <RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>
 ```
 
+### Did the door really open?
+
+The `door_status` section is a second read-only `GET`, to the terminal's work status. It
+reports the lock state and the magnet contact per door, and the magnet is the physical
+door:
+
+```yaml
+door_status:
+  supported: true
+  doors:
+    - door_no: 1
+      locked: true
+      magnet_open: false
+```
+
+Open the door, then download the diagnostics again. If `magnet_open` becomes `true`, the
+door physically opened. If it stays `false`, the command reached the terminal and the
+terminal accepted it, but the relay or the lock did not move, which is a wiring or power
+problem rather than a command problem. If `locked` turns `false` while `magnet_open` stays
+`false`, the relay fired and the magnet or its wiring is the suspect.
+
 Call the service with **`dry_run: true`** to build the command and log it without sending
 it. The log line names the request that would go out, and the terminal is not touched:
 
@@ -256,9 +277,10 @@ for it to expire; the integration will not keep trying and extend it.
 To see which endpoint the account may use, download the diagnostics from the integration
 page. The `probe` section reports `ok` or an error for `System/deviceInfo`,
 `AccessControl/AcsEvent`, `AccessControl/UserInfo/Search`, `AccessControl/UserInfo/Count`,
-`AccessControl/Door/Count` and `AccessControl/RemoteControl/door/capabilities`; the host
-and credentials are redacted. The last one is read-only and is what tells you whether the
-account may control a door, without a door being opened.
+`AccessControl/Door/Count`, `AccessControl/RemoteControl/door/capabilities` and
+`AccessControl/AcsWorkStatus`; the host and credentials are redacted. The last two are
+read-only and are what tell you whether the account may control a door and whether a door
+is actually open, without a door being opened.
 
 If the terminal clock drifts more than a minute from Home Assistant, a warning is logged
 at startup. The device filters events by its own clock, so a large drift means entries

@@ -567,3 +567,24 @@ def test_parse_door_capabilities_reads_a_real_terminal_reply() -> None:
     # The integration still offers `resume`, but this terminal does not accept it, so the
     # capability report is the only place that difference shows up.
     assert "resume" not in result["commands"]
+
+
+async def test_door_status_reports_lock_and_magnet_state(client: HikvisionAccessClient) -> None:
+    """The read-only work status answers whether a door is locked and whether it is open."""
+
+    result = await client.get_door_status()
+
+    assert result["supported"] is True
+    assert result["doors"] == [{"door_no": 1, "locked": True, "magnet_open": False}]
+
+
+def test_as_int_list_accepts_a_single_value_and_skips_junk() -> None:
+    """A terminal may report one door as a bare value, and junk must not read as a state."""
+
+    from custom_components.hikvision_access.isapi import _as_int_list
+
+    assert _as_int_list([0, 1]) == [0, 1]
+    assert _as_int_list(1) == [1]
+    assert _as_int_list(None) == []
+    assert _as_int_list(["1", "x"]) == [1, None]
+

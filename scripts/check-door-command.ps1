@@ -75,6 +75,19 @@ if ($diag.data.door_control.supported) {
     Write-Host "  An error here means the account may lack door-control permission." -ForegroundColor Yellow
 }
 
+Write-Host "`nDoor status, read from the device (read-only, opens nothing):" -ForegroundColor Yellow
+if ($diag.data.door_status.supported) {
+    foreach ($d in $diag.data.door_status.doors) {
+        $lock = if ($d.locked) { 'locked' } else { 'unlocked' }
+        $magnet = if ($d.magnet_open) { 'OPEN' } else { 'closed' }
+        Write-Host ("  Door {0}: lock={1}  magnet={2}" -f $d.door_no, $lock, $magnet)
+    }
+    Write-Host "  The magnet is the physical door. Run this again right after opening: if the" -ForegroundColor Yellow
+    Write-Host "  magnet never says OPEN, the relay or the lock is the problem, not the command." -ForegroundColor Yellow
+} else {
+    Write-Host ("  Not reported: {0}" -f $diag.data.door_status.error) -ForegroundColor Red
+}
+
 if ($hasDoorCommands) {
     Write-Host "`nDoor commands that WOULD be sent (nothing is sent by reading this):" -ForegroundColor Yellow
     $diag.data.door_commands.PSObject.Properties | ForEach-Object {

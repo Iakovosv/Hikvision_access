@@ -54,10 +54,20 @@ async def async_get_config_entry_diagnostics(
         "last_exception": type(coordinator.last_exception).__name__ if coordinator.last_exception else None,
         "door_commands": _door_command_preview(coordinator.door_numbers),
         "door_control": await _door_control_capabilities(client),
+        "door_status": await _door_status(client),
         "probe": await _probe_endpoints(hass, entry, client=client),
     }
 
     return diagnostics
+
+
+async def _door_status(client: HikvisionAccessClient) -> dict[str, Any]:
+    """Report whether each door is locked and whether the magnet says it is open."""
+
+    try:
+        return await client.get_door_status()
+    except HikvisionAccessError as ex:
+        return {"supported": False, "error": f"{type(ex).__name__}: {ex}"}
 
 
 async def _door_control_capabilities(client: HikvisionAccessClient) -> dict[str, Any]:
@@ -157,6 +167,13 @@ async def _probe_endpoints(
             "door_control_capabilities",
             "GET",
             "AccessControl/RemoteControl/door/capabilities",
+            None,
+        ),
+        (
+            # Read-only lock and magnet state, which says whether a door is actually open.
+            "door_work_status",
+            "GET",
+            "AccessControl/AcsWorkStatus?format=json",
             None,
         ),
     )

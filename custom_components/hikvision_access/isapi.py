@@ -692,6 +692,54 @@ class HikvisionAccessClient:
             return {"supported": False, "doors": [], "commands": []}
         return _parse_door_capabilities(raw)
 
+    async def get_door_status(self) -> dict[str, Any]:
+        """Read the lock and magnet state of each door. Read-only, opens nothing.
+
+        This is what answers whether a door really opened: the magnet contact reports
+        the physical door, so a command that the terminal accepted but that the relay
+        never carried shows up here as a door that stayed shut.
+        """
+
+        response = await self.request("GET", "AccessControl/AcsWorkStatus?format=json")
+        status = response.get("AcsWorkStatus") if isinstance(response, dict) else None
+        if not isinstance(status, dict):
+            return {"supported": False, "doors": []}
+
+        lock_states = _as_int_list(status.get("doorLockStatus"))
+        magnet_states = _as_int_list(status.get("magneticStatus"))
+
+        doors = []
+        for index, lock_state in enumerate(lock_states):
+            magnet_state = magnet_states[index] if index < len(magnet_states) else None
+            doors.append(
+                {
+                    "door_no": index + 1,
+                    "locked": None if lock_state is None else lock_state == 0,
+                    "magnet_open": None if magnet_state is None else magnet_state == 1,
+                }
+            )
+        return {"supported": True, "doors": doors}
+
+
+def _as_int_list(value: Any) -> list[int | None]:
+    """Return an ISAPI status list as ints.
+
+    The device reports per-door state either as a list or as a single value, so both are
+    accepted; anything that is not a number becomes None rather than a wrong reading.
+    """
+
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        value = [value]
+    result: list[int | None] = []
+    for item in value:
+        try:
+            result.append(int(item))
+        except (TypeError, ValueError):
+            result.append(None)
+    return result
+
 
 def _as_positive_int(value: Any) -> int | None:
     """Return value as a positive int, or None when it is not one."""

@@ -110,6 +110,18 @@ def make_handler(
                     "</RemoteControlDoor>"
                 ),
             )
+        if suffix.endswith("AccessControl/AcsWorkStatus"):
+            # Read-only lock and magnet state per door. 0 means locked/closed.
+            count = door_count or 1
+            return httpx.Response(
+                200,
+                json={
+                    "AcsWorkStatus": {
+                        "doorLockStatus": [0] * count,
+                        "magneticStatus": [0] * count,
+                    }
+                },
+            )
         if suffix.endswith("AccessControl/AcsEvent"):
             return httpx.Response(200, json={"AcsEvent": _event_page(request, events, page_size)})
         if suffix.endswith("AccessControl/UserInfo/Search"):
