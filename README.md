@@ -174,6 +174,12 @@ terminal accepted it, but the relay or the lock did not move, which is a wiring 
 problem rather than a command problem. If `locked` turns `false` while `magnet_open` stays
 `false`, the relay fired and the magnet or its wiring is the suspect.
 
+A terminal with **no door contact wired** reports `doorStatus: [4]`, which means it cannot
+tell, and `magnet_open` then stays `false` whatever happens. Do not read that as a failed
+command: on such a terminal `locked` is the field that matters, because it is the relay
+state. An electric lock or a strike is driven by that relay, so `locked` going from `true`
+to `false` is the whole answer, and the magnet adds nothing.
+
 Call the service with **`dry_run: true`** to build the command and log it without sending
 it. The log line names the request that would go out, and the terminal is not touched:
 

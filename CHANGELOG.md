@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.13
+
+- **Every distributed file now carries the copyright header.** The PowerShell scripts,
+  the tests, the blueprint, `services.yaml` and the workflows were shipped without one,
+  so the terms they are released under were not visible in the files themselves.
+- **The README no longer assumes a door contact is wired.** A terminal with no magnet
+  reports `doorStatus: [4]`, which means it cannot tell, and `magnet_open` then stays
+  `false` whatever happens. On such a terminal the relay state (`locked`) is the whole
+  answer, which is what an electric lock or a strike is driven by.
+
 ## 0.6.12
 
 - **A refused door command is no longer reported as success.** A terminal can answer a

@@ -1,3 +1,7 @@
+# Copyright (c) 2026 Iakovosv. All rights reserved.
+# Personal use only. Commercial use requires written permission.
+# See LICENSE and COMMERCIAL.md. Redistribution prohibited.
+
 """Every string the flow can display must resolve, in every shipped language.
 
 A missing translation does not fall back to English in the UI: Home Assistant shows the raw

@@ -1,3 +1,7 @@
+# Copyright (c) 2026 Iakovosv. All rights reserved.
+# Personal use only. Commercial use requires written permission.
+# See LICENSE and COMMERCIAL.md. Redistribution prohibited.
+
 """The logbook line for an access event names the person and how they opened the door.
 
 `hassfest` forbids a `logbook` translation category, so the strings live in the platform and

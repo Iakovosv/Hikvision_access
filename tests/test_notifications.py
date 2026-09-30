@@ -1,3 +1,7 @@
+# Copyright (c) 2026 Iakovosv. All rights reserved.
+# Personal use only. Commercial use requires written permission.
+# See LICENSE and COMMERCIAL.md. Redistribution prohibited.
+
 """The optional notification and announcement, and the promise that they stay off.
 
 Nothing here may fire unless the user turned it on, so every test either enables the feature

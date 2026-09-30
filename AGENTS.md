@@ -20,7 +20,11 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
   told apart from a wrong password via `_auth_verified`. Person calls: `create_person`
   (UserInfo/Record), `modify_person` (UserInfo/Modify), `delete_person`,
   `get_users`, `get_person`, `get_person_count`, `set_card`, `delete_card`, `open_door`,
-  `get_door_count`.
+  `get_door_count`. Door calls: `open_door` (RemoteControl/door/N, PUT, `dry_run` builds
+  the request without sending), `get_door_capabilities` (read-only, which doors and which
+  commands), `get_door_status` (read-only, lock and magnet per door). The button, the
+  service and the options flow all build the request through `door_command_path` and
+  `door_command_body`, so a door number cannot drift between them.
 - `coordinator.py` — polls `AcsEvent` and fires `hikvision_access_event`. Holds
   `door_numbers`, filled at setup from the device; defaults to `[1]` so a terminal that
   cannot be asked is never shown doors it lacks.
@@ -43,7 +47,15 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
 - `services.py` / `services.yaml` — YAML equivalents (`create_visitor`, `delete_user`,
   `open_door`).
 - `diagnostics.py` — redacted report; probes endpoints directly when setup failed (there
-  is no coordinator then).
+  is no coordinator then). Carries `door_commands` (the exact request per door),
+  `door_control` (read-only capabilities) and `door_status` (read-only lock and magnet),
+  which is how a door command is checked without opening a door.
+- `scripts/` — Windows helpers, all needing `curl.exe` because PowerShell's own
+  `Invoke-RestMethod` cannot do digest auth. `check-door-command.ps1` reads the
+  capabilities over the HA REST API; `open-door.ps1` opens through the integration's own
+  service (`-DryRun` prints without sending); `test-lock.ps1` talks to the terminal
+  directly, with HA out of the picture, which separates a device fault from an integration
+  fault (`-Open` sends, otherwise read-only).
 
 ## Device facts that matter
 
@@ -109,6 +121,22 @@ DS-K1T805MBFWX, firmware V1.9.1 build 240909.
 - The number of doors differs by model. Ask `AccessControl/Door/Count`, else walk
   `System/capabilities`, and expose only what is reported; some terminals are single door.
   A 404 on an endpoint is a normal "not supported", not an error to surface.
+
+- **A door command can be refused with HTTP 200.** The RemoteControl PUT answers 200
+  either way, so only the device's own `<statusCode>` tells success (1, `OK`) from a
+  refusal (4, `Invalid Operation`). Reading the HTTP status alone reports a door that
+  never opened as opened. Confirmed on the reference device: an accepted open answers
+  `<statusCode>1</statusCode><statusString>OK</statusString><subStatusCode>ok</subStatusCode>`.
+  The `<requestURL>` in that reply comes back empty on this firmware and means nothing.
+- The reference device reports its door capabilities as
+  `<doorNo min="1" max="1">1</doorNo><cmd opt="open,close,alwaysOpen,alwaysClose"/>`
+  — no `resume`, so do not assume the documented list is the accepted one. Ask.
+- `AcsWorkStatus` on a terminal with **no door contact** reports `doorStatus: [4]`, which
+  means "cannot tell". `doorLockStatus` is the field that answers whether the relay
+  fired (0 locked, 1 unlocked); the magnet is only meaningful when a contact is wired.
+- Driving the relay directly from Windows needs `curl.exe --digest`: PowerShell's own
+  `Invoke-RestMethod` cannot do digest auth. A plain `curl` (not `curl.exe`) is the
+  PowerShell alias for `Invoke-WebRequest` and fails differently.
 
 ## Conventions
 

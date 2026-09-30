@@ -1,3 +1,7 @@
+# Copyright (c) 2026 Iakovosv. All rights reserved.
+# Personal use only. Commercial use requires written permission.
+# See LICENSE and COMMERCIAL.md. Redistribution prohibited.
+
 create_visitor:
   name: Create visitor
   description: Create a visitor on the access control terminal with a validity window and a PIN. Newer firmware can also do this from the integration's Configure button.

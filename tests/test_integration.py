@@ -1,3 +1,7 @@
+# Copyright (c) 2026 Iakovosv. All rights reserved.
+# Personal use only. Commercial use requires written permission.
+# See LICENSE and COMMERCIAL.md. Redistribution prohibited.
+
 """End to end tests: set up the integration and exercise entities and services."""
 
 from __future__ import annotations
