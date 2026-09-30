@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Iakovosv. All rights reserved.
+# Personal use only. Commercial use requires written permission.
+# See LICENSE and COMMERCIAL.md. Redistribution prohibited.
 """Binary sensor for the last access event on a terminal."""
 
 from __future__ import annotations

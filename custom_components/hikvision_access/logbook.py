@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Iakovosv. All rights reserved.
+# Personal use only. Commercial use requires written permission.
+# See LICENSE and COMMERCIAL.md. Redistribution prohibited.
 """Describe an access in the Home Assistant Activity log.
 
 `hassfest` rejects a `logbook` translation category, and no core integration ships one, so the

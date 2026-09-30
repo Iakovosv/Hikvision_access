@@ -56,3 +56,16 @@ everyone else. There is no paid tier for private use, and nothing here is behind
 
 This is an independent project. It is not made by, endorsed by, or supported by Hikvision.
 "Hikvision" is a trademark of its owner and is used only to say what the integration talks to.
+
+## Reporting unlicensed use
+
+If you find this integration redistributed, forked, bundled into another product, or installed
+for a client without a licence, please report it through the
+[issue tracker](https://github.com/Iakovosv/Hikvision_access/issues) or to the address on the
+repository owner's profile. A link and a screenshot are enough.
+
+Redistribution is prohibited by [LICENSE](LICENSE), and GitHub will act on a copyright
+complaint for a fork that strips the licence or the copyright notices. Reports are welcome;
+they are also the only way the author finds out, because the integration runs locally and
+sends nothing back.
+

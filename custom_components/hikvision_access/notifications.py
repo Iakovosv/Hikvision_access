@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Iakovosv. All rights reserved.
+# Personal use only. Commercial use requires written permission.
+# See LICENSE and COMMERCIAL.md. Redistribution prohibited.
 """Optional notification and announcement for an access event.
 
 Every setting here is off by default: the listener is cheap while nothing is enabled, and it

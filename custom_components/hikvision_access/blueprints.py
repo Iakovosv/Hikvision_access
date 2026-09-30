@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Iakovosv. All rights reserved.
+# Personal use only. Commercial use requires written permission.
+# See LICENSE and COMMERCIAL.md. Redistribution prohibited.
 """Install the bundled automation blueprint so it shows up in the UI.
 
 Home Assistant only auto-populates blueprints that ship inside its own `automation`
