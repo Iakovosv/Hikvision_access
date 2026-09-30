@@ -18,6 +18,26 @@ from .const import ACS_EVENT_MAJOR
 
 _LOGGER = logging.getLogger(__name__)
 
+# The door commands the terminal accepts on the RemoteControl endpoint.
+DOOR_COMMANDS: Final = ("open", "close", "alwaysOpen", "alwaysClose", "resume")
+
+
+def door_command_path(door_no: int) -> str:
+    """Return the RemoteControl path for a door.
+
+    Both the button and the service build their request here, so the door number cannot
+    drift apart between the two.
+    """
+
+    return f"AccessControl/RemoteControl/door/{door_no}"
+
+
+def door_command_body(command: str = "open") -> str:
+    """Return the XML body for a door command."""
+
+    return f"<RemoteControlDoor><cmd>{command}</cmd></RemoteControlDoor>"
+
+
 
 class HikvisionAccessError(Exception):
     """Base error for the access control client."""
@@ -622,13 +642,31 @@ class HikvisionAccessClient:
             headers={"Content-Type": "application/json"},
         )
 
-    async def open_door(self, door_no: int = 1) -> dict[str, Any]:
-        """Unlock a door once."""
+    async def open_door(self, door_no: int = 1, *, command: str = "open", dry_run: bool = False) -> dict[str, Any]:
+        """Send a door command to the terminal.
+
+        With `dry_run` the request is built and logged but never sent, which lets the
+        command be verified from a distance without unlocking anything.
+        """
+
+        if command not in DOOR_COMMANDS:
+            raise HikvisionAccessError(f"Unsupported door command: {command}")
+
+        path = door_command_path(door_no)
+        body = door_command_body(command)
+
+        if dry_run:
+            _LOGGER.warning(
+                "Dry run: would send PUT %s with body %s (nothing was sent to the device)",
+                path,
+                body,
+            )
+            return {"dry_run": True, "method": "PUT", "path": path, "body": body}
 
         return await self.request(
             "PUT",
-            f"AccessControl/RemoteControl/door/{door_no}",
-            data="<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>",
+            path,
+            data=body,
             headers={"Content-Type": "application/xml"},
         )
 

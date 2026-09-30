@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.12
+
+- **You can check the door command without opening the door.** A terminal answers a door
+  command only by unlocking, so there is no read-only probe for it. Two ways around that:
+  the diagnostics now carry a `door_commands` section with the exact method, path and body
+  that would be sent for each door, and `hikvision_access.open_door` takes a `dry_run`
+  option that builds and logs the request without sending it. Neither touches the device.
+- **The door command is built in one place.** The button, the service and the Configure
+  menu each used to spell out the path themselves, which is how a door number drifts. They
+  now share `door_command_path` and `door_command_body`.
+- **The tests now prove the right door is unlocked.** The fake terminal accepted any
+  request under `RemoteControl/door/`, so a test passed even when the wrong door number,
+  method or command was sent. It now refuses anything that is not a `PUT` with a valid
+  `RemoteControlDoor` body, and the door tests assert the method, the full path and the
+  exact body. Changing the door number, the method or the body makes them fail.
+
 ## 0.6.11
 
 - **The person who opened the door now has its own sensor.** The last-access binary

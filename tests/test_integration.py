@@ -147,7 +147,11 @@ async def test_setup_follows_the_door_count_of_the_device(
 
 
 async def test_open_door_button_presses(hass: HomeAssistant, monkeypatch) -> None:
-    """Pressing a door button sends the unlock command to the device."""
+    """Pressing a door button sends exactly one correct unlock command.
+
+    The door number, the method and the body are all asserted, so a change that unlocks
+    the wrong door, or that stops unlocking at all, fails here.
+    """
 
     entry, captured = await _setup(hass, monkeypatch, [ACCESS_EVENT])
     await hass.async_block_till_done()
@@ -159,8 +163,50 @@ async def test_open_door_button_presses(hass: HomeAssistant, monkeypatch) -> Non
         blocking=True,
     )
 
-    door = [r for r in captured if "RemoteControl/door/1" in str(r.url)][-1]
-    assert b"<cmd>open</cmd>" in door.content
+    door_requests = [r for r in captured if "RemoteControl/door/" in str(r.url)]
+    assert len(door_requests) == 1
+    request = door_requests[0]
+    assert request.method == "PUT"
+    assert request.url.path.endswith("/ISAPI/AccessControl/RemoteControl/door/1")
+    assert request.content == b"<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>"
+
+
+async def test_open_door_button_targets_its_own_door(hass: HomeAssistant, monkeypatch) -> None:
+    """Each door button unlocks the door in its own entity id, and no other."""
+
+    entry, captured = await _setup(hass, monkeypatch, [ACCESS_EVENT], door_count=4)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        "button",
+        "press",
+        {"entity_id": "button.front_door_open_door_3"},
+        blocking=True,
+    )
+
+    door_requests = [r for r in captured if "RemoteControl/door/" in str(r.url)]
+    assert len(door_requests) == 1
+    assert door_requests[0].url.path.endswith("/ISAPI/AccessControl/RemoteControl/door/3")
+
+
+async def test_open_door_service_and_button_agree(hass: HomeAssistant, monkeypatch) -> None:
+    """The service and the button send the same bytes for the same door."""
+
+    entry, captured = await _setup(hass, monkeypatch, [ACCESS_EVENT], door_count=2)
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        "button", "press", {"entity_id": "button.front_door_open_door_2"}, blocking=True
+    )
+    await hass.services.async_call(DOMAIN, SERVICE_OPEN_DOOR, {"door_no": 2}, blocking=True)
+    await hass.async_block_till_done()
+
+    door_requests = [r for r in captured if "RemoteControl/door/" in str(r.url)]
+    assert len(door_requests) == 2
+    for request in door_requests:
+        assert request.method == "PUT"
+        assert request.url.path.endswith("/ISAPI/AccessControl/RemoteControl/door/2")
+        assert request.content == b"<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>"
 
 
 async def test_last_access_sensor_is_unknown_before_any_event(
@@ -359,15 +405,39 @@ async def test_delete_user_service(hass: HomeAssistant, monkeypatch) -> None:
 
 
 async def test_open_door_service(hass: HomeAssistant, monkeypatch) -> None:
-    """The open door service sends the RemoteControlDoor command."""
+    """The open door service sends the RemoteControlDoor command for the right door."""
 
     entry, captured = await _setup(hass, monkeypatch)
 
     await hass.services.async_call(DOMAIN, SERVICE_OPEN_DOOR, {"door_no": 1}, blocking=True)
     await hass.async_block_till_done()
 
-    door = [r for r in captured if r.url.path.endswith("RemoteControl/door/1")][-1]
-    assert b"<cmd>open</cmd>" in door.content
+    door_requests = [r for r in captured if "RemoteControl/door/" in str(r.url)]
+    assert len(door_requests) == 1
+    assert door_requests[0].method == "PUT"
+    assert door_requests[0].url.path.endswith("/ISAPI/AccessControl/RemoteControl/door/1")
+    assert door_requests[0].content == b"<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>"
+
+
+async def test_open_door_dry_run_sends_nothing(hass: HomeAssistant, monkeypatch) -> None:
+    """A dry run builds the command and touches no door.
+
+    This is the check that can be run from a distance: it proves what would be sent,
+    while the device is never asked to unlock anything.
+    """
+
+    entry, captured = await _setup(hass, monkeypatch, [ACCESS_EVENT], door_count=2)
+    await hass.async_block_till_done()
+
+    before = len(captured)
+    await hass.services.async_call(
+        DOMAIN, SERVICE_OPEN_DOOR, {"door_no": 2, "dry_run": True}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    door_requests = [r for r in captured if "RemoteControl/door/" in str(r.url)]
+    assert door_requests == []
+    assert len(captured) == before
 
 
 async def test_setup_without_event_permission_stays_loaded(
@@ -440,6 +510,33 @@ async def test_diagnostics_redact_credentials(hass: HomeAssistant, monkeypatch) 
     dumped = str(diagnostics["entry"])
     assert "secret" not in dumped
     assert "192.0.2.10" not in dumped
+
+
+async def test_diagnostics_show_the_door_command_without_sending_it(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """Diagnostics describe the door command, and downloading them unlocks nothing.
+
+    The report has to name the exact request for the command to be checkable from a
+    distance, so the request is built here and compared, while the captured requests are
+    searched to prove no door command was sent.
+    """
+
+    entry, captured = await _setup(hass, monkeypatch, [ACCESS_EVENT], door_count=2)
+
+    from custom_components.hikvision_access.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+
+    diagnostics = await async_get_config_entry_diagnostics(hass, entry)
+
+    assert diagnostics["door_commands"]["door_1"] == {
+        "method": "PUT",
+        "path": "AccessControl/RemoteControl/door/1",
+        "body": "<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>",
+    }
+    assert diagnostics["door_commands"]["door_2"]["path"] == "AccessControl/RemoteControl/door/2"
+    assert [r for r in captured if "RemoteControl/door/" in str(r.url)] == []
 
 
 async def test_diagnostics_probe_when_setup_failed(hass: HomeAssistant, monkeypatch) -> None:

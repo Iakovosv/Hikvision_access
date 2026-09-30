@@ -59,6 +59,7 @@ ATTR_CARD_NO: Final = "card_no"
 ATTR_VALIDITY_ENABLED: Final = "validity_enabled"
 ATTR_AUTO_PIN: Final = "auto_pin"
 ATTR_MAX_TIMES: Final = "max_times"
+ATTR_DRY_RUN: Final = "dry_run"
 
 GENDERS: Final = ("male", "female", "unknown")
 USER_TYPES: Final = ("normal", "visitor")
