@@ -9,6 +9,7 @@ import asyncio
 import datetime as dt
 import json
 import logging
+import re
 from typing import Any, Final
 
 import httpx
@@ -18,7 +19,9 @@ from .const import ACS_EVENT_MAJOR
 
 _LOGGER = logging.getLogger(__name__)
 
-# The door commands the terminal accepts on the RemoteControl endpoint.
+# The commands the RemoteControl endpoint documents. A given terminal may accept fewer:
+# the DS-K1T805MBFWX does not list `resume`. `get_door_capabilities` reports the exact
+# list for the device in front of you.
 DOOR_COMMANDS: Final = ("open", "close", "alwaysOpen", "alwaysClose", "resume")
 
 
@@ -663,17 +666,80 @@ class HikvisionAccessClient:
             )
             return {"dry_run": True, "method": "PUT", "path": path, "body": body}
 
-        return await self.request(
+        response = await self.request(
             "PUT",
             path,
             data=body,
             headers={"Content-Type": "application/xml"},
         )
+        return _door_command_result(response, path=path, body=body)
 
     def event_picture_url(self, event_id: str) -> str:
         """Return the URL of the snapshot attached to an access event."""
 
         return f"{self.host}/ISAPI/AccessControl/AcsEvent?format=json&picType=url&eventId={event_id}"
+
+    async def get_door_capabilities(self) -> dict[str, Any]:
+        """Ask the terminal which doors it has and which door commands it accepts.
+
+        This is a read-only GET, so it answers whether a door command is supported
+        without unlocking anything. The reply is XML, which `request` returns under
+        `raw`; it is parsed here into the door range and the command list.
+        """
+
+        response = await self.request("GET", "AccessControl/RemoteControl/door/capabilities")
+        raw = response.get("raw") if isinstance(response, dict) else None
+        if not raw:
+            return {"supported": False, "doors": [], "commands": []}
+        return _parse_door_capabilities(raw)
+
+    async def get_door_status(self) -> dict[str, Any]:
+        """Read the lock and magnet state of each door. Read-only, opens nothing.
+
+        This is what answers whether a door really opened: the magnet contact reports
+        the physical door, so a command that the terminal accepted but that the relay
+        never carried shows up here as a door that stayed shut.
+        """
+
+        response = await self.request("GET", "AccessControl/AcsWorkStatus?format=json")
+        status = response.get("AcsWorkStatus") if isinstance(response, dict) else None
+        if not isinstance(status, dict):
+            return {"supported": False, "doors": []}
+
+        lock_states = _as_int_list(status.get("doorLockStatus"))
+        magnet_states = _as_int_list(status.get("magneticStatus"))
+
+        doors = []
+        for index, lock_state in enumerate(lock_states):
+            magnet_state = magnet_states[index] if index < len(magnet_states) else None
+            doors.append(
+                {
+                    "door_no": index + 1,
+                    "locked": None if lock_state is None else lock_state == 0,
+                    "magnet_open": None if magnet_state is None else magnet_state == 1,
+                }
+            )
+        return {"supported": True, "doors": doors}
+
+
+def _as_int_list(value: Any) -> list[int | None]:
+    """Return an ISAPI status list as ints.
+
+    The device reports per-door state either as a list or as a single value, so both are
+    accepted; anything that is not a number becomes None rather than a wrong reading.
+    """
+
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        value = [value]
+    result: list[int | None] = []
+    for item in value:
+        try:
+            result.append(int(item))
+        except (TypeError, ValueError):
+            result.append(None)
+    return result
 
 
 def _as_positive_int(value: Any) -> int | None:
@@ -684,6 +750,78 @@ def _as_positive_int(value: Any) -> int | None:
     except (TypeError, ValueError):
         return None
     return count if count > 0 else None
+
+
+def _door_command_result(response: Any, *, path: str, body: str) -> dict[str, Any]:
+    """Read a door command reply and refuse to call a rejection a success.
+
+    A terminal answers an accepted command with HTTP 200 and
+
+        <ResponseStatus>
+          <statusCode>1</statusCode>
+          <statusString>OK</statusString>
+        </ResponseStatus>
+
+    but it can also answer HTTP 200 with a failure such as
+
+        <statusCode>4</statusCode>
+        <statusString>Invalid Operation</statusString>
+
+    for a door with no relay, or a command the model does not accept. A bare HTTP 200
+    would report those as a door that opened, so the device's own status code is read
+    and a non-zero one is raised, carrying the message the device gave.
+    """
+
+    raw = response.get("raw") if isinstance(response, dict) else None
+    if not raw:
+        return {"sent": True, "method": "PUT", "path": path, "body": body, "status_code": None}
+
+    code_match = re.search(r"<statusCode>\s*(-?\d+)\s*</statusCode>", raw)
+    code = int(code_match.group(1)) if code_match else None
+    message_match = re.search(r"<statusString>([^<]*)</statusString>", raw)
+    message = message_match.group(1).strip() if message_match else ""
+
+    if code not in (None, 0, 1):
+        raise HikvisionAccessError(
+            f"The terminal refused the door command for {path}: {message or 'no message'} "
+            f"(statusCode {code})"
+        )
+
+    return {
+        "sent": True,
+        "method": "PUT",
+        "path": path,
+        "body": body,
+        "status_code": code,
+        "status_string": message,
+    }
+
+
+def _parse_door_capabilities(raw: str) -> dict[str, Any]:
+    """Read the door range and the accepted commands out of the capability XML.
+
+    A reply looks like:
+
+        <RemoteControlDoor>
+          <doorNo min="1" max="2"/>
+          <cmd opt="open,close,alwaysOpen,alwaysClose,resume"/>
+        </RemoteControlDoor>
+
+    The attribute order is not guaranteed, so each attribute is matched on its own.
+    """
+
+    def attribute(tag: str, name: str) -> str | None:
+        match = re.search(rf"<{tag}\b[^>]*\b{name}\s*=\s*\"([^\"]*)\"", raw)
+        return match.group(1) if match else None
+
+    door_min = _as_positive_int(attribute("doorNo", "min"))
+    door_max = _as_positive_int(attribute("doorNo", "max"))
+    doors = list(range(door_min, door_max + 1)) if door_min and door_max and door_max >= door_min else []
+
+    cmd_opt = attribute("cmd", "opt")
+    commands = [c.strip() for c in cmd_opt.split(",") if c.strip()] if cmd_opt else []
+
+    return {"supported": True, "doors": doors, "commands": commands}
 
 
 def _find_door_count(capabilities: Any) -> int | None:

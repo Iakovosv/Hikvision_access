@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import httpx
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
@@ -26,6 +28,16 @@ ACCESS_EVENT = {
     "doorNo": 1,
     "eventId": "evt-1",
 }
+
+# A door command targets a numbered door; the read-only capability report does not, so
+# matching on the number keeps the two apart.
+DOOR_COMMAND_RE = re.compile(r"RemoteControl/door/\d+$")
+
+
+def _door_commands(captured: list[httpx.Request]) -> list[httpx.Request]:
+    """Return only the requests that act on a door, not the read-only capability GET."""
+
+    return [r for r in captured if DOOR_COMMAND_RE.search(str(r.url))]
 
 
 async def _setup(hass: HomeAssistant, monkeypatch, events=None, **handler_kwargs):
@@ -163,7 +175,7 @@ async def test_open_door_button_presses(hass: HomeAssistant, monkeypatch) -> Non
         blocking=True,
     )
 
-    door_requests = [r for r in captured if "RemoteControl/door/" in str(r.url)]
+    door_requests = _door_commands(captured)
     assert len(door_requests) == 1
     request = door_requests[0]
     assert request.method == "PUT"
@@ -184,7 +196,7 @@ async def test_open_door_button_targets_its_own_door(hass: HomeAssistant, monkey
         blocking=True,
     )
 
-    door_requests = [r for r in captured if "RemoteControl/door/" in str(r.url)]
+    door_requests = _door_commands(captured)
     assert len(door_requests) == 1
     assert door_requests[0].url.path.endswith("/ISAPI/AccessControl/RemoteControl/door/3")
 
@@ -201,7 +213,7 @@ async def test_open_door_service_and_button_agree(hass: HomeAssistant, monkeypat
     await hass.services.async_call(DOMAIN, SERVICE_OPEN_DOOR, {"door_no": 2}, blocking=True)
     await hass.async_block_till_done()
 
-    door_requests = [r for r in captured if "RemoteControl/door/" in str(r.url)]
+    door_requests = _door_commands(captured)
     assert len(door_requests) == 2
     for request in door_requests:
         assert request.method == "PUT"
@@ -412,7 +424,7 @@ async def test_open_door_service(hass: HomeAssistant, monkeypatch) -> None:
     await hass.services.async_call(DOMAIN, SERVICE_OPEN_DOOR, {"door_no": 1}, blocking=True)
     await hass.async_block_till_done()
 
-    door_requests = [r for r in captured if "RemoteControl/door/" in str(r.url)]
+    door_requests = _door_commands(captured)
     assert len(door_requests) == 1
     assert door_requests[0].method == "PUT"
     assert door_requests[0].url.path.endswith("/ISAPI/AccessControl/RemoteControl/door/1")
@@ -435,7 +447,7 @@ async def test_open_door_dry_run_sends_nothing(hass: HomeAssistant, monkeypatch)
     )
     await hass.async_block_till_done()
 
-    door_requests = [r for r in captured if "RemoteControl/door/" in str(r.url)]
+    door_requests = _door_commands(captured)
     assert door_requests == []
     assert len(captured) == before
 
@@ -536,7 +548,15 @@ async def test_diagnostics_show_the_door_command_without_sending_it(
         "body": "<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>",
     }
     assert diagnostics["door_commands"]["door_2"]["path"] == "AccessControl/RemoteControl/door/2"
-    assert [r for r in captured if "RemoteControl/door/" in str(r.url)] == []
+    assert _door_commands(captured) == []
+    # The capability report is read-only: it names the doors and commands without a door
+    # command being sent.
+    assert diagnostics["door_control"]["supported"] is True
+    assert diagnostics["door_control"]["doors"] == [1, 2]
+    assert "open" in diagnostics["door_control"]["commands"]
+    # The work status is read-only too, and reports the lock and magnet per door.
+    assert diagnostics["door_status"]["supported"] is True
+    assert diagnostics["door_status"]["doors"][0] == {"door_no": 1, "locked": True, "magnet_open": False}
 
 
 async def test_diagnostics_probe_when_setup_failed(hass: HomeAssistant, monkeypatch) -> None:

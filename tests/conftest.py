@@ -34,6 +34,7 @@ def make_handler(
     lockout_paths: set[str] | None = None,
     error_paths: set[str] | None = None,
     door_count: int | None = None,
+    door_reply: str | None = None,
 ):
     """Build a transport handler that mimics an access control terminal.
 
@@ -42,6 +43,8 @@ def make_handler(
     `denied_paths` answers 401 even after a valid login, the way ISAPI reports a
     missing permission, and `lockout_paths` answers the 401 lockout body.
     `error_paths` answers 500, which makes setup fail as a transport error.
+    `door_reply` replaces the body the door endpoint answers with, so a refusal can be
+    tested without a real terminal.
     """
 
     events = events if events is not None else []
@@ -98,6 +101,30 @@ def make_handler(
             if door_count is None:
                 return httpx.Response(404, json={"statusCode": 4})
             return httpx.Response(200, json={"DoorCount": {"doorNumber": f"{door_count}"}})
+        if suffix.endswith("AccessControl/RemoteControl/door/capabilities"):
+            # Read-only capability report, the way a terminal answers it.
+            return httpx.Response(
+                200,
+                text=(
+                    '<?xml version="1.0" encoding="UTF-8"?>'
+                    '<RemoteControlDoor version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">'
+                    f'<doorNo min="1" max="{door_count or 1}"/>'
+                    '<cmd opt="open,close,alwaysOpen,alwaysClose,resume"/>'
+                    "</RemoteControlDoor>"
+                ),
+            )
+        if suffix.endswith("AccessControl/AcsWorkStatus"):
+            # Read-only lock and magnet state per door. 0 means locked/closed.
+            count = door_count or 1
+            return httpx.Response(
+                200,
+                json={
+                    "AcsWorkStatus": {
+                        "doorLockStatus": [0] * count,
+                        "magneticStatus": [0] * count,
+                    }
+                },
+            )
         if suffix.endswith("AccessControl/AcsEvent"):
             return httpx.Response(200, json={"AcsEvent": _event_page(request, events, page_size)})
         if suffix.endswith("AccessControl/UserInfo/Search"):
@@ -123,6 +150,8 @@ def make_handler(
                 return httpx.Response(400, json={"statusCode": 4, "statusString": "Invalid Operation"})
             if not re.fullmatch(r"<RemoteControlDoor><cmd>(open|close|alwaysOpen|alwaysClose|resume)</cmd></RemoteControlDoor>", request.content.decode()):
                 return httpx.Response(400, json={"statusCode": 4, "statusString": "Invalid Operation"})
+            if door_reply is not None:
+                return httpx.Response(200, text=door_reply)
             return httpx.Response(200, text="<ResponseStatus><statusCode>1</statusCode></ResponseStatus>")
         return httpx.Response(404, json={"statusCode": 4, "statusString": "Invalid Operation"})
 

@@ -501,3 +501,147 @@ async def test_open_door_rejects_an_unknown_command(client: HikvisionAccessClien
 
     with pytest.raises(HikvisionAccessError):
         await client.open_door(1, command="unlock")
+
+
+async def test_open_door_reports_the_status_the_device_returned() -> None:
+    """An accepted command carries the device's own status code back to the caller."""
+
+    captured: list[httpx.Request] = []
+    session = httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            make_handler(
+                captured=captured,
+                door_reply=(
+                    '<?xml version="1.0" encoding="UTF-8"?>'
+                    '<ResponseStatus version="2.0">'
+                    "<statusCode>1</statusCode>"
+                    "<statusString>OK</statusString>"
+                    "<subStatusCode>ok</subStatusCode>"
+                    "</ResponseStatus>"
+                ),
+            )
+        )
+    )
+    client = HikvisionAccessClient(HOST, "admin", "secret", session=session)
+
+    result = await client.open_door(1)
+
+    assert result["sent"] is True
+    assert result["status_code"] == 1
+    assert result["status_string"] == "OK"
+
+
+async def test_open_door_raises_when_the_device_refuses_the_command() -> None:
+    """HTTP 200 with a failing statusCode is a refusal, not a door that opened.
+
+    A door with no relay, or a command the model does not accept, is answered this way.
+    Reporting it as success would tell an automation the door opened when it did not.
+    """
+
+    session = httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            make_handler(
+                door_reply=(
+                    '<?xml version="1.0" encoding="UTF-8"?>'
+                    '<ResponseStatus version="2.0">'
+                    "<statusCode>4</statusCode>"
+                    "<statusString>Invalid Operation</statusString>"
+                    "</ResponseStatus>"
+                ),
+            )
+        )
+    )
+    client = HikvisionAccessClient(HOST, "admin", "secret", session=session)
+
+    with pytest.raises(HikvisionAccessError) as excinfo:
+        await client.open_door(1)
+
+    assert "Invalid Operation" in str(excinfo.value)
+    assert "statusCode 4" in str(excinfo.value)
+
+
+async def test_door_capabilities_report_doors_and_commands(client: HikvisionAccessClient) -> None:
+    """The read-only capability GET answers which doors and commands are supported."""
+
+    result = await client.get_door_capabilities()
+
+    assert result["supported"] is True
+    assert result["doors"] == [1]
+    assert "open" in result["commands"]
+
+
+def test_parse_door_capabilities_reads_a_door_range() -> None:
+    """The parser turns the XML attributes into a door list and a command list."""
+
+    from custom_components.hikvision_access.isapi import _parse_door_capabilities
+
+    raw = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<RemoteControlDoor version="2.0">'
+        '<doorNo min="1" max="4"/>'
+        '<cmd opt="open,close,alwaysOpen,alwaysClose,resume"/>'
+        "</RemoteControlDoor>"
+    )
+
+    assert _parse_door_capabilities(raw) == {
+        "supported": True,
+        "doors": [1, 2, 3, 4],
+        "commands": ["open", "close", "alwaysOpen", "alwaysClose", "resume"],
+    }
+
+
+def test_parse_door_capabilities_reads_attributes_in_any_order() -> None:
+    """The attribute order in the reply is not guaranteed, so it must not matter."""
+
+    from custom_components.hikvision_access.isapi import _parse_door_capabilities
+
+    raw = '<RemoteControlDoor><doorNo max="2" min="1"/><cmd opt="open"/></RemoteControlDoor>'
+
+    assert _parse_door_capabilities(raw) == {"supported": True, "doors": [1, 2], "commands": ["open"]}
+
+
+def test_parse_door_capabilities_reads_a_real_terminal_reply() -> None:
+    """A DS-K1T805MBFWX reply, copied verbatim from the terminal.
+
+    It differs from the documented shape in two ways that must not break the parser: the
+    door number is repeated as element text, and `resume` is absent from the command list.
+    """
+
+    from custom_components.hikvision_access.isapi import _parse_door_capabilities
+
+    raw = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<RemoteControlDoor version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">\n'
+        '  <doorNo min="1" max="1">1</doorNo>\n'
+        '  <cmd opt="open,close,alwaysOpen,alwaysClose"/>\n'
+        "</RemoteControlDoor>"
+    )
+
+    result = _parse_door_capabilities(raw)
+
+    assert result["doors"] == [1]
+    assert "open" in result["commands"]
+    # The integration still offers `resume`, but this terminal does not accept it, so the
+    # capability report is the only place that difference shows up.
+    assert "resume" not in result["commands"]
+
+
+async def test_door_status_reports_lock_and_magnet_state(client: HikvisionAccessClient) -> None:
+    """The read-only work status answers whether a door is locked and whether it is open."""
+
+    result = await client.get_door_status()
+
+    assert result["supported"] is True
+    assert result["doors"] == [{"door_no": 1, "locked": True, "magnet_open": False}]
+
+
+def test_as_int_list_accepts_a_single_value_and_skips_junk() -> None:
+    """A terminal may report one door as a bare value, and junk must not read as a state."""
+
+    from custom_components.hikvision_access.isapi import _as_int_list
+
+    assert _as_int_list([0, 1]) == [0, 1]
+    assert _as_int_list(1) == [1]
+    assert _as_int_list(None) == []
+    assert _as_int_list(["1", "x"]) == [1, None]
+

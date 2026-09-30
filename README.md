@@ -120,13 +120,30 @@ The same actions are available as services if you prefer them in a script:
 
 ### Checking the door command without opening the door
 
-There is no read-only way to ask a terminal whether a door command is allowed: the only
-request that answers is the one that unlocks the door. Two things let you check the command
-from a distance instead.
+There is no way to make a terminal unlock a door as a test, but there is a read-only way
+to ask whether it would accept the command. Three things let you check from a distance.
 
-Download the **diagnostics** from the integration page. The `door_commands` section shows
-the exact method, path and body that would be sent for each door, and downloading the
-report sends no door command:
+Download the **diagnostics** from the integration page. The `door_control` section is a
+read-only `GET` to the terminal's door capability endpoint, and it reports which doors it
+can control and which commands it accepts:
+
+```yaml
+door_control:
+  supported: true
+  doors: [1]
+  commands: [open, close, alwaysOpen, alwaysClose]
+```
+
+If `open` is in `commands`, the button sends a command the device accepts. If the section
+carries an `error`, the account most likely lacks door-control permission. Downloading the
+report sends no door command.
+
+The command list is the terminal's own, so it can be shorter than the ISAPI documentation.
+A DS-K1T805MBFWX, for instance, does not list `resume`. That difference is worth knowing:
+the integration will still build a `resume` request if asked, but the terminal would
+refuse it. The report is the only place the difference is visible.
+
+The same report shows the exact request that would be sent, per door:
 
 ```yaml
 door_commands:
@@ -135,6 +152,27 @@ door_commands:
     path: AccessControl/RemoteControl/door/1
     body: <RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>
 ```
+
+### Did the door really open?
+
+The `door_status` section is a second read-only `GET`, to the terminal's work status. It
+reports the lock state and the magnet contact per door, and the magnet is the physical
+door:
+
+```yaml
+door_status:
+  supported: true
+  doors:
+    - door_no: 1
+      locked: true
+      magnet_open: false
+```
+
+Open the door, then download the diagnostics again. If `magnet_open` becomes `true`, the
+door physically opened. If it stays `false`, the command reached the terminal and the
+terminal accepted it, but the relay or the lock did not move, which is a wiring or power
+problem rather than a command problem. If `locked` turns `false` while `magnet_open` stays
+`false`, the relay fired and the magnet or its wiring is the suspect.
 
 Call the service with **`dry_run: true`** to build the command and log it without sending
 it. The log line names the request that would go out, and the terminal is not touched:
@@ -149,6 +187,39 @@ data:
 If the terminal reports more than one door, pressing a button for a door with no relay
 wired is the only end-to-end test that is completely safe: the whole path is exercised
 and no door opens.
+
+On Windows, `scripts/check-door-command.ps1` does the first two checks for you over the
+Home Assistant REST API. Set `HA_URL` and an admin `HA_TOKEN`, run it, and it prints the
+command that would be sent without sending it.
+
+`scripts/open-door.ps1` goes one step further and opens the door through the integration's
+own service, so the request that reaches the terminal is built by the integration:
+
+```powershell
+$env:HA_URL   = "http://homeassistant.local:8123"
+$env:HA_TOKEN = "<long lived access token>"
+
+.\open-door.ps1 -DryRun     # print the request, send nothing
+.\open-door.ps1             # send it for door 1
+.\open-door.ps1 -DoorNo 2   # send it for door 2
+```
+
+It prints the exact request first, then sends it, then reads the door status back from the
+terminal. `-DryRun` stops after printing, which is the safe way to confirm the command
+before a door moves.
+
+`scripts/test-lock.ps1` does the same checks against the terminal directly, with Home
+Assistant out of the picture, which is what tells a device problem apart from an
+integration problem. It always reads the door capabilities and the lock state, and only
+sends the command with `-Open`:
+
+```powershell
+.\test-lock.ps1 -Ip 192.168.1.163 -Password 'THE_PASSWORD'          # read-only
+.\test-lock.ps1 -Ip 192.168.1.163 -Password 'THE_PASSWORD' -Open    # open the door
+```
+
+All three scripts need `curl.exe`, which ships with Windows 10 1803 and later. PowerShell's
+own `Invoke-RestMethod` cannot do digest authentication, which the terminal requires.
 
 ## Requirements
 
@@ -234,8 +305,11 @@ for it to expire; the integration will not keep trying and extend it.
 
 To see which endpoint the account may use, download the diagnostics from the integration
 page. The `probe` section reports `ok` or an error for `System/deviceInfo`,
-`AccessControl/AcsEvent`, `AccessControl/UserInfo/Search`, `AccessControl/UserInfo/Count`
-and `AccessControl/Door/Count`; the host and credentials are redacted.
+`AccessControl/AcsEvent`, `AccessControl/UserInfo/Search`, `AccessControl/UserInfo/Count`,
+`AccessControl/Door/Count`, `AccessControl/RemoteControl/door/capabilities` and
+`AccessControl/AcsWorkStatus`; the host and credentials are redacted. The last two are
+read-only and are what tell you whether the account may control a door and whether a door
+is actually open, without a door being opened.
 
 If the terminal clock drifts more than a minute from Home Assistant, a warning is logged
 at startup. The device filters events by its own clock, so a large drift means entries
