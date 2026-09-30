@@ -2,6 +2,9 @@
 
 ## 0.6.12
 
+- **The door command can be sent from Windows.** `scripts/open-door.ps1` opens a door
+  through the integration's own service, printing the exact request first and reading the
+  door status back from the terminal afterwards. `-DryRun` stops after printing.
 - **You can check the door command without opening the door.** A terminal answers a door
   command only by unlocking, so there is no way to test it. Four ways around that: the
   diagnostics now carry a `door_control` section, read from the terminal's read-only door

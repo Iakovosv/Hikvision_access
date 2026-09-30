@@ -192,6 +192,22 @@ On Windows, `scripts/check-door-command.ps1` does the first two checks for you o
 Home Assistant REST API. Set `HA_URL` and an admin `HA_TOKEN`, run it, and it prints the
 command that would be sent without sending it.
 
+`scripts/open-door.ps1` goes one step further and opens the door through the integration's
+own service, so the request that reaches the terminal is built by the integration:
+
+```powershell
+$env:HA_URL   = "http://homeassistant.local:8123"
+$env:HA_TOKEN = "<long lived access token>"
+
+.\open-door.ps1 -DryRun     # print the request, send nothing
+.\open-door.ps1             # send it for door 1
+.\open-door.ps1 -DoorNo 2   # send it for door 2
+```
+
+It prints the exact request first, then sends it, then reads the door status back from the
+terminal. `-DryRun` stops after printing, which is the safe way to confirm the command
+before a door moves.
+
 ## Requirements
 
 - Home Assistant 2026.8 or newer
