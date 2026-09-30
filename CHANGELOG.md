@@ -10,6 +10,8 @@
 - **The door command can be sent from Windows.** `scripts/open-door.ps1` opens a door
   through the integration's own service, printing the exact request first and reading the
   door status back from the terminal afterwards. `-DryRun` stops after printing.
+  `scripts/test-lock.ps1` does the same against the terminal directly, with Home Assistant
+  out of the picture, which tells a device problem apart from an integration problem.
 - **You can check the door command without opening the door.** A terminal answers a door
   command only by unlocking, so there is no way to test it. Four ways around that: the
   diagnostics now carry a `door_control` section, read from the terminal's read-only door

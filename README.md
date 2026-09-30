@@ -208,6 +208,19 @@ It prints the exact request first, then sends it, then reads the door status bac
 terminal. `-DryRun` stops after printing, which is the safe way to confirm the command
 before a door moves.
 
+`scripts/test-lock.ps1` does the same checks against the terminal directly, with Home
+Assistant out of the picture, which is what tells a device problem apart from an
+integration problem. It always reads the door capabilities and the lock state, and only
+sends the command with `-Open`:
+
+```powershell
+.\test-lock.ps1 -Ip 192.168.1.163 -Password 'THE_PASSWORD'          # read-only
+.\test-lock.ps1 -Ip 192.168.1.163 -Password 'THE_PASSWORD' -Open    # open the door
+```
+
+All three scripts need `curl.exe`, which ships with Windows 10 1803 and later. PowerShell's
+own `Invoke-RestMethod` cannot do digest authentication, which the terminal requires.
+
 ## Requirements
 
 - Home Assistant 2026.8 or newer
