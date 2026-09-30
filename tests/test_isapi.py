@@ -541,3 +541,29 @@ def test_parse_door_capabilities_reads_attributes_in_any_order() -> None:
     raw = '<RemoteControlDoor><doorNo max="2" min="1"/><cmd opt="open"/></RemoteControlDoor>'
 
     assert _parse_door_capabilities(raw) == {"supported": True, "doors": [1, 2], "commands": ["open"]}
+
+
+def test_parse_door_capabilities_reads_a_real_terminal_reply() -> None:
+    """A DS-K1T805MBFWX reply, copied verbatim from the terminal.
+
+    It differs from the documented shape in two ways that must not break the parser: the
+    door number is repeated as element text, and `resume` is absent from the command list.
+    """
+
+    from custom_components.hikvision_access.isapi import _parse_door_capabilities
+
+    raw = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<RemoteControlDoor version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">\n'
+        '  <doorNo min="1" max="1">1</doorNo>\n'
+        '  <cmd opt="open,close,alwaysOpen,alwaysClose"/>\n'
+        "</RemoteControlDoor>"
+    )
+
+    result = _parse_door_capabilities(raw)
+
+    assert result["doors"] == [1]
+    assert "open" in result["commands"]
+    # The integration still offers `resume`, but this terminal does not accept it, so the
+    # capability report is the only place that difference shows up.
+    assert "resume" not in result["commands"]

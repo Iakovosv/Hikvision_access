@@ -19,7 +19,9 @@ from .const import ACS_EVENT_MAJOR
 
 _LOGGER = logging.getLogger(__name__)
 
-# The door commands the terminal accepts on the RemoteControl endpoint.
+# The commands the RemoteControl endpoint documents. A given terminal may accept fewer:
+# the DS-K1T805MBFWX does not list `resume`. `get_door_capabilities` reports the exact
+# list for the device in front of you.
 DOOR_COMMANDS: Final = ("open", "close", "alwaysOpen", "alwaysClose", "resume")
 
 

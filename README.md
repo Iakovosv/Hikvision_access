@@ -131,12 +131,17 @@ can control and which commands it accepts:
 door_control:
   supported: true
   doors: [1]
-  commands: [open, close, alwaysOpen, alwaysClose, resume]
+  commands: [open, close, alwaysOpen, alwaysClose]
 ```
 
 If `open` is in `commands`, the button sends a command the device accepts. If the section
 carries an `error`, the account most likely lacks door-control permission. Downloading the
 report sends no door command.
+
+The command list is the terminal's own, so it can be shorter than the ISAPI documentation.
+A DS-K1T805MBFWX, for instance, does not list `resume`. That difference is worth knowing:
+the integration will still build a `resume` request if asked, but the terminal would
+refuse it. The report is the only place the difference is visible.
 
 The same report shows the exact request that would be sent, per door:
 
