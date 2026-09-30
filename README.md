@@ -1,7 +1,38 @@
 # Hikvision Access Control
 
+[![CI](https://github.com/Iakovosv/Hikvision_access/actions/workflows/testing.yml/badge.svg)](https://github.com/Iakovosv/Hikvision_access/actions/workflows/testing.yml)
+[![HACS Action](https://github.com/Iakovosv/Hikvision_access/actions/workflows/hacs.yml/badge.svg)](https://github.com/Iakovosv/Hikvision_access/actions/workflows/hacs.yml)
+[![hassfest](https://github.com/Iakovosv/Hikvision_access/actions/workflows/hassfest.yml/badge.svg)](https://github.com/Iakovosv/Hikvision_access/actions/workflows/hassfest.yml)
+![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.8%2B-blue)
+![License](https://img.shields.io/badge/license-source--available-orange)
+
 A Home Assistant integration for Hikvision access control terminals (door stations / face
 terminals), talking to the device directly over ISAPI. No cloud.
+
+## Which devices this is for
+
+If your device is a Hikvision **access control terminal** — the kind that reads a card, a
+fingerprint or a face to open a door — rather than a camera or an NVR, this is the
+integration for it. It has been built and verified against one device:
+
+| Device | Type | Firmware |
+| --- | --- | --- |
+| **DS-K1T805MBFWX** | Face-recognition access terminal | V1.9.1 build 240909 |
+
+That terminal is the reference: every endpoint, every event code and every field named in
+this README was confirmed on it. The wider **DS-K1T series** (the MinMoe face terminals) and
+other Hikvision access terminals expose the same `AccessControl/...` ISAPI interface, so
+they are expected to work. The integration asks the device what it supports instead of
+assuming, which is why a single-door terminal shows one door button and not a fixed pair.
+See [Compatibility](#compatibility) for what to send if your model answers differently.
+
+The common names for these devices — *door station*, *face terminal*, *access control
+terminal*, *entrance terminal*, *MinMoe* — all describe the same family this integration
+speaks to.
+
+**What it is not.** It is not a camera or NVR integration (Home Assistant's built-in
+`hikvision` integration covers those), and it does not use Hik-Connect or any cloud
+service. It talks to the terminal on your own network, and nothing leaves the house.
 
 ## Everything is done from the UI
 
@@ -23,6 +54,17 @@ The YAML further down is **optional**. It is for two cases only: reacting to an 
 automation you write yourself, and the visitor/delete/open-door services, if you would rather
 call them from a script than from the `Configure` menu. If you do not need those, you never
 have to open a text editor.
+
+## Contents
+
+- [Which devices this is for](#which-devices-this-is-for)
+- [Everything is done from the UI](#everything-is-done-from-the-ui)
+- [What you get](#what-you-get) — [entities](#entities), [the Configure menu](#the-configure-menu), [notifications](#notifications-and-announcements), [blueprint](#blueprint-lights-when-the-door-opens), [events](#events-for-automations-you-write-yourself), [services](#services-optional-yaml)
+- [Checking the door command without opening the door](#checking-the-door-command-without-opening-the-door)
+- [Requirements](#requirements) · [Installation](#installation) · [Compatibility](#compatibility)
+- [Permissions, and the "Unauthorized" message](#permissions-and-the-unauthorized-message)
+- [Device safety](#device-safety) · [Reporting issues](#reporting-issues)
+- [Commercial use, and support](#commercial-use-and-support) · [License](#license)
 
 ## What you get
 
@@ -409,8 +451,9 @@ The details are in [COMMERCIAL.md](COMMERCIAL.md). To ask for one, open a discus
 "Commercial licence", or use the issue tracker. There is no price list: quotes are given per
 request, based on the number of sites and whether support is included.
 
-If the integration is useful to you personally, you can also support the work with a
-one-off donation — the **Sponsor** button at the top of the repository.
+If the integration is useful to you personally, a one-off donation is welcome but never
+expected: everything works the same without it. A star on the repository helps just as
+much, because it is what makes the integration easier for the next person to find.
 
 ## License
 

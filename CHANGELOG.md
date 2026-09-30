@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.14
+
+- **The README says which devices it is for.** A reader arriving from a search could not
+  tell whether this integration covers their device, because the model was only named
+  further down. The reference device, the DS-K1T family it stands for, the common names
+  for these terminals, and what the integration is *not* (no camera, no NVR, no cloud)
+  are now at the top, together with build badges and a table of contents.
+- **The README no longer promises a Sponsor button that does not exist.** It pointed at a
+  button that only appears once a funding link is configured, which it is not. The
+  paragraph now asks for nothing and mentions the star instead, which does help.
+- **The funding file explains itself.** `FUNDING.yml` still ships with every link
+  commented out, so nothing is displayed until a link is chosen, but it now names the
+  supported options, their fees, and the fact that GitHub Sponsors covers Greece.
+
 ## 0.6.13
 
 - **Every distributed file now carries the copyright header.** The PowerShell scripts,

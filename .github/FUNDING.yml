@@ -1,10 +1,21 @@
 # Funding links shown on the repository.
 #
-# Uncomment and fill in the ones you set up. They are all optional; the repository works
-# fine without any of them. Only the keys with a value are shown.
+# Copyright (c) 2026 Iakovosv. All rights reserved.
+# Personal use only. Commercial use requires written permission.
+# See LICENSE and COMMERCIAL.md. Redistribution prohibited.
 #
-# github: [Iakovosv]                    # needs GitHub Sponsors approved for your account
+# Only the keys with a value are shown as a button. Everything here is optional; the
+# integration works the same without any of them, and no feature is ever put behind one.
+
+# GitHub Sponsors. Greece is on the supported list, so this can be switched on from
+# https://github.com/sponsors. Uncomment it once the account is approved, otherwise the
+# button does not appear.
+# github: [Iakovosv]
+
+# A tip jar for one-off donations. Uncomment whichever one you set up.
 # ko_fi: your_ko_fi_name                # 0% fee, active immediately, no approval
 # buy_me_a_coffee: your_bmc_name        # 5% fee
 # liberapay: your_liberapay_name        # 0% fee, monthly only
+
+# Any other link, e.g. a PayPal.me page or your own page.
 # custom: ["https://www.paypal.me/your_name"]
