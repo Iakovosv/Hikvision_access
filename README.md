@@ -283,6 +283,23 @@ automation:
           message: "PIN {{ trigger.event.data.pin }} valid until {{ trigger.event.data.end_time }}"
 ```
 
+## Commercial use, and support
+
+At home it is free: install it, run it, report bugs, ask questions. Nothing is behind a
+paywall, and private users get the same code as everyone else.
+
+If you are an installer or a company and you use it **for a client**, or ship it as part of
+a product or a managed service, that needs a licence. A licence is also the way to get
+support: a direct channel, priority on bugs, and help during installation.
+
+The details are in [COMMERCIAL.md](COMMERCIAL.md). To ask for one, open a discussion in
+[GitHub Discussions](https://github.com/Iakovosv/Hikvision_access/discussions) titled
+"Commercial licence", or use the issue tracker. There is no price list: quotes are given per
+request, based on the number of sites and whether support is included.
+
+If the integration is useful to you personally, you can also support the work with a
+one-off donation — the **Sponsor** button at the top of the repository.
+
 ## License
 
 Source-available, all rights reserved, see [LICENSE](LICENSE). Free to install and run for
