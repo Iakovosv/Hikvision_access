@@ -43,26 +43,33 @@ $entry = $entries | Where-Object { $_.domain -eq 'hikvision_access' } | Select-O
 if (-not $entry) { throw "No hikvision_access config entry found. Is the integration set up?" }
 
 $diag = Invoke-RestMethod -Uri "$HaUrl/api/diagnostics/config_entry/$($entry.entry_id)" -Headers $headers -Method Get
-$device = $diag.data.device
-Write-Host ("Device: {0} {1}" -f $device.model, $device.firmware)
-Write-Host ("Doors reported: {0}" -f ($diag.data.door_numbers -join ', '))
-
-$preview = $diag.data.door_commands."door_$DoorNo"
-if (-not $preview) {
-    throw "The diagnostics name no door $DoorNo. Doors reported: $($diag.data.door_numbers -join ', ')"
+if ($diag.data.device) {
+    Write-Host ("Device: {0} {1}" -f $diag.data.device.model, $diag.data.device.firmware)
 }
 
-Write-Host "`nThe exact request the integration would send:" -ForegroundColor Yellow
-Write-Host ("  {0} /ISAPI/{1}" -f $preview.method, $preview.path)
-Write-Host ("  body: {0}" -f $preview.body)
+# The door command preview arrived in 0.6.12. An older integration still opens the door
+# through the service, it just cannot name the request, so this stays optional.
+$preview = $diag.data.door_commands."door_$DoorNo"
+if ($preview) {
+    Write-Host ("Doors reported: {0}" -f ($diag.data.door_numbers -join ', '))
+    Write-Host "`nThe exact request the integration would send:" -ForegroundColor Yellow
+    Write-Host ("  {0} /ISAPI/{1}" -f $preview.method, $preview.path)
+    Write-Host ("  body: {0}" -f $preview.body)
+} else {
+    Write-Host "`nThis integration is older than 0.6.12, so it cannot name the request." -ForegroundColor Yellow
+    Write-Host "The command it sends for a door is:" -ForegroundColor Yellow
+    Write-Host "  PUT /ISAPI/AccessControl/RemoteControl/door/$DoorNo"
+    Write-Host "  body: <RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>"
+}
 
 if ($DryRun) {
     Write-Host "`n=== Dry run: the request is built and logged, nothing is sent ===" -ForegroundColor Cyan
     $body = @{ door_no = $DoorNo; dry_run = $true } | ConvertTo-Json
     Invoke-RestMethod -Uri "$HaUrl/api/services/hikvision_access/open_door" -Headers $headers `
         -Method Post -Body $body -ContentType 'application/json' | Out-Null
-    Write-Host "The service accepted the dry run. Home Assistant logs a line like:" -ForegroundColor Green
-    Write-Host ("  Dry run: would send {0} {1} with body {2}" -f $preview.method, $preview.path, $preview.body)
+    Write-Host "The service accepted the dry run. Home Assistant logged a line like:" -ForegroundColor Green
+    Write-Host ("  Dry run: would send PUT AccessControl/RemoteControl/door/$DoorNo with body <RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>")
+    Write-Host "Look under Settings / System / Logs, filtering for hikvision_access." -ForegroundColor Green
     Write-Host "Nothing was sent to the terminal." -ForegroundColor Green
     return
 }
