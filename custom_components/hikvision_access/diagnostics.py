@@ -53,10 +53,20 @@ async def async_get_config_entry_diagnostics(
         "persons_enrolled": coordinator.persons_enrolled,
         "last_exception": type(coordinator.last_exception).__name__ if coordinator.last_exception else None,
         "door_commands": _door_command_preview(coordinator.door_numbers),
+        "door_control": await _door_control_capabilities(client),
         "probe": await _probe_endpoints(hass, entry, client=client),
     }
 
     return diagnostics
+
+
+async def _door_control_capabilities(client: HikvisionAccessClient) -> dict[str, Any]:
+    """Report which doors and commands the terminal accepts, without opening one."""
+
+    try:
+        return await client.get_door_capabilities()
+    except HikvisionAccessError as ex:
+        return {"supported": False, "error": f"{type(ex).__name__}: {ex}"}
 
 
 def _door_command_preview(door_numbers: list[int]) -> dict[str, dict[str, str]]:
@@ -138,6 +148,15 @@ async def _probe_endpoints(
             "door_count",
             "GET",
             "AccessControl/Door/Count?format=json",
+            None,
+        ),
+        (
+            # Read-only, and the only request that answers whether the account may
+            # control a door: the terminal reports the door range and the accepted
+            # commands without unlocking anything.
+            "door_control_capabilities",
+            "GET",
+            "AccessControl/RemoteControl/door/capabilities",
             None,
         ),
     )

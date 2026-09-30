@@ -98,6 +98,18 @@ def make_handler(
             if door_count is None:
                 return httpx.Response(404, json={"statusCode": 4})
             return httpx.Response(200, json={"DoorCount": {"doorNumber": f"{door_count}"}})
+        if suffix.endswith("AccessControl/RemoteControl/door/capabilities"):
+            # Read-only capability report, the way a terminal answers it.
+            return httpx.Response(
+                200,
+                text=(
+                    '<?xml version="1.0" encoding="UTF-8"?>'
+                    '<RemoteControlDoor version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">'
+                    f'<doorNo min="1" max="{door_count or 1}"/>'
+                    '<cmd opt="open,close,alwaysOpen,alwaysClose,resume"/>'
+                    "</RemoteControlDoor>"
+                ),
+            )
         if suffix.endswith("AccessControl/AcsEvent"):
             return httpx.Response(200, json={"AcsEvent": _event_page(request, events, page_size)})
         if suffix.endswith("AccessControl/UserInfo/Search"):

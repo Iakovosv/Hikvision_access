@@ -9,6 +9,7 @@ import asyncio
 import datetime as dt
 import json
 import logging
+import re
 from typing import Any, Final
 
 import httpx
@@ -675,6 +676,20 @@ class HikvisionAccessClient:
 
         return f"{self.host}/ISAPI/AccessControl/AcsEvent?format=json&picType=url&eventId={event_id}"
 
+    async def get_door_capabilities(self) -> dict[str, Any]:
+        """Ask the terminal which doors it has and which door commands it accepts.
+
+        This is a read-only GET, so it answers whether a door command is supported
+        without unlocking anything. The reply is XML, which `request` returns under
+        `raw`; it is parsed here into the door range and the command list.
+        """
+
+        response = await self.request("GET", "AccessControl/RemoteControl/door/capabilities")
+        raw = response.get("raw") if isinstance(response, dict) else None
+        if not raw:
+            return {"supported": False, "doors": [], "commands": []}
+        return _parse_door_capabilities(raw)
+
 
 def _as_positive_int(value: Any) -> int | None:
     """Return value as a positive int, or None when it is not one."""
@@ -684,6 +699,33 @@ def _as_positive_int(value: Any) -> int | None:
     except (TypeError, ValueError):
         return None
     return count if count > 0 else None
+
+
+def _parse_door_capabilities(raw: str) -> dict[str, Any]:
+    """Read the door range and the accepted commands out of the capability XML.
+
+    A reply looks like:
+
+        <RemoteControlDoor>
+          <doorNo min="1" max="2"/>
+          <cmd opt="open,close,alwaysOpen,alwaysClose,resume"/>
+        </RemoteControlDoor>
+
+    The attribute order is not guaranteed, so each attribute is matched on its own.
+    """
+
+    def attribute(tag: str, name: str) -> str | None:
+        match = re.search(rf"<{tag}\b[^>]*\b{name}\s*=\s*\"([^\"]*)\"", raw)
+        return match.group(1) if match else None
+
+    door_min = _as_positive_int(attribute("doorNo", "min"))
+    door_max = _as_positive_int(attribute("doorNo", "max"))
+    doors = list(range(door_min, door_max + 1)) if door_min and door_max and door_max >= door_min else []
+
+    cmd_opt = attribute("cmd", "opt")
+    commands = [c.strip() for c in cmd_opt.split(",") if c.strip()] if cmd_opt else []
+
+    return {"supported": True, "doors": doors, "commands": commands}
 
 
 def _find_door_count(capabilities: Any) -> int | None:

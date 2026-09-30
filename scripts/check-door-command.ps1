@@ -49,6 +49,20 @@ Write-Host ("Device: {0} {1}" -f $diag.data.device.model, $diag.data.device.firm
 Write-Host ("Doors reported: {0}" -f ($diag.data.door_numbers -join ', '))
 Write-Host ("Last update ok: {0}" -f $diag.data.last_update_success)
 
+Write-Host "`nDoor control support, read from the device (read-only):" -ForegroundColor Yellow
+if ($diag.data.door_control.supported) {
+    Write-Host ("  Doors the device can control: {0}" -f ($diag.data.door_control.doors -join ', ')) -ForegroundColor Green
+    Write-Host ("  Commands the device accepts:  {0}" -f ($diag.data.door_control.commands -join ', ')) -ForegroundColor Green
+    if ($diag.data.door_control.commands -contains 'open') {
+        Write-Host "  'open' is supported, so the button sends a command the device accepts." -ForegroundColor Green
+    } else {
+        Write-Host "  'open' is NOT in the list: the device would refuse the command." -ForegroundColor Red
+    }
+} else {
+    Write-Host ("  Not reported: {0}" -f $diag.data.door_control.error) -ForegroundColor Red
+    Write-Host "  An error here means the account may lack door-control permission." -ForegroundColor Yellow
+}
+
 Write-Host "`nDoor commands that WOULD be sent (nothing is sent by reading this):" -ForegroundColor Yellow
 $diag.data.door_commands.PSObject.Properties | ForEach-Object {
     $c = $_.Value

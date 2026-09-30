@@ -501,3 +501,43 @@ async def test_open_door_rejects_an_unknown_command(client: HikvisionAccessClien
 
     with pytest.raises(HikvisionAccessError):
         await client.open_door(1, command="unlock")
+
+
+async def test_door_capabilities_report_doors_and_commands(client: HikvisionAccessClient) -> None:
+    """The read-only capability GET answers which doors and commands are supported."""
+
+    result = await client.get_door_capabilities()
+
+    assert result["supported"] is True
+    assert result["doors"] == [1]
+    assert "open" in result["commands"]
+
+
+def test_parse_door_capabilities_reads_a_door_range() -> None:
+    """The parser turns the XML attributes into a door list and a command list."""
+
+    from custom_components.hikvision_access.isapi import _parse_door_capabilities
+
+    raw = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<RemoteControlDoor version="2.0">'
+        '<doorNo min="1" max="4"/>'
+        '<cmd opt="open,close,alwaysOpen,alwaysClose,resume"/>'
+        "</RemoteControlDoor>"
+    )
+
+    assert _parse_door_capabilities(raw) == {
+        "supported": True,
+        "doors": [1, 2, 3, 4],
+        "commands": ["open", "close", "alwaysOpen", "alwaysClose", "resume"],
+    }
+
+
+def test_parse_door_capabilities_reads_attributes_in_any_order() -> None:
+    """The attribute order in the reply is not guaranteed, so it must not matter."""
+
+    from custom_components.hikvision_access.isapi import _parse_door_capabilities
+
+    raw = '<RemoteControlDoor><doorNo max="2" min="1"/><cmd opt="open"/></RemoteControlDoor>'
+
+    assert _parse_door_capabilities(raw) == {"supported": True, "doors": [1, 2], "commands": ["open"]}

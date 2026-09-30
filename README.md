@@ -120,13 +120,25 @@ The same actions are available as services if you prefer them in a script:
 
 ### Checking the door command without opening the door
 
-There is no read-only way to ask a terminal whether a door command is allowed: the only
-request that answers is the one that unlocks the door. Two things let you check the command
-from a distance instead.
+There is no way to make a terminal unlock a door as a test, but there is a read-only way
+to ask whether it would accept the command. Three things let you check from a distance.
 
-Download the **diagnostics** from the integration page. The `door_commands` section shows
-the exact method, path and body that would be sent for each door, and downloading the
-report sends no door command:
+Download the **diagnostics** from the integration page. The `door_control` section is a
+read-only `GET` to the terminal's door capability endpoint, and it reports which doors it
+can control and which commands it accepts:
+
+```yaml
+door_control:
+  supported: true
+  doors: [1]
+  commands: [open, close, alwaysOpen, alwaysClose, resume]
+```
+
+If `open` is in `commands`, the button sends a command the device accepts. If the section
+carries an `error`, the account most likely lacks door-control permission. Downloading the
+report sends no door command.
+
+The same report shows the exact request that would be sent, per door:
 
 ```yaml
 door_commands:
@@ -238,8 +250,10 @@ for it to expire; the integration will not keep trying and extend it.
 
 To see which endpoint the account may use, download the diagnostics from the integration
 page. The `probe` section reports `ok` or an error for `System/deviceInfo`,
-`AccessControl/AcsEvent`, `AccessControl/UserInfo/Search`, `AccessControl/UserInfo/Count`
-and `AccessControl/Door/Count`; the host and credentials are redacted.
+`AccessControl/AcsEvent`, `AccessControl/UserInfo/Search`, `AccessControl/UserInfo/Count`,
+`AccessControl/Door/Count` and `AccessControl/RemoteControl/door/capabilities`; the host
+and credentials are redacted. The last one is read-only and is what tells you whether the
+account may control a door, without a door being opened.
 
 If the terminal clock drifts more than a minute from Home Assistant, a warning is logged
 at startup. The device filters events by its own clock, so a large drift means entries
