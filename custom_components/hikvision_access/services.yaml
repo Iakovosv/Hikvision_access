@@ -97,3 +97,11 @@ open_door:
           min: 1
           max: 4
           mode: box
+    dry_run:
+      name: Dry run
+      description: >-
+        Build the command and log it without sending it. Use this to check that the right
+        request would reach the terminal, without unlocking anything.
+      default: false
+      selector:
+        boolean:

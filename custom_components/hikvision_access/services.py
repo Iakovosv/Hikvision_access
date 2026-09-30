@@ -19,6 +19,7 @@ from .const import (
     ATTR_BEGIN_TIME,
     ATTR_CARD_NO,
     ATTR_DOOR_NO,
+    ATTR_DRY_RUN,
     ATTR_EMPLOYEE_NO,
     ATTR_END_TIME,
     ATTR_GENDER,
@@ -56,7 +57,12 @@ CREATE_VISITOR_SCHEMA = vol.Schema(
 
 DELETE_USER_SCHEMA = vol.Schema({vol.Required(ATTR_EMPLOYEE_NO): cv.string})
 
-OPEN_DOOR_SCHEMA = vol.Schema({vol.Optional(ATTR_DOOR_NO, default=1): vol.Coerce(int)})
+OPEN_DOOR_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_DOOR_NO, default=1): vol.Coerce(int),
+        vol.Optional(ATTR_DRY_RUN, default=False): cv.boolean,
+    }
+)
 
 
 async def async_setup_services(hass: HomeAssistant) -> None:
@@ -126,15 +132,16 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         await coordinator.client.delete_person(call.data[ATTR_EMPLOYEE_NO])
 
     async def handle_open_door(call: ServiceCall) -> None:
-        """Unlock a door once."""
+        """Send a door command to the terminal.
+
+        `dry_run` builds and logs the request without sending it, so the command can be
+        checked from a distance without opening the door.
+        """
 
         coordinator = await _coordinator_for(call)
-        door_no = call.data[ATTR_DOOR_NO]
-        await coordinator.client.request(
-            "PUT",
-            "AccessControl/RemoteControl/door/1" if door_no == 1 else f"AccessControl/RemoteControl/door/{door_no}",
-            data="<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>",
-            headers={"Content-Type": "application/xml"},
+        await coordinator.client.open_door(
+            call.data[ATTR_DOOR_NO],
+            dry_run=call.data.get(ATTR_DRY_RUN, False),
         )
 
     hass.services.async_register(DOMAIN, SERVICE_CREATE_VISITOR, handle_create_visitor, schema=CREATE_VISITOR_SCHEMA)

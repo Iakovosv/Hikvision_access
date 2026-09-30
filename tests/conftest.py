@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import httpx
@@ -114,6 +115,14 @@ def make_handler(
         if suffix.endswith("AccessControl/CardInfo/Delete"):
             return httpx.Response(200, json={"statusCode": 1, "statusString": "OK"})
         if "RemoteControl/door/" in suffix:
+            # A real terminal only acts on a PUT carrying a RemoteControlDoor body, for the
+            # door in the path. Anything else is refused here too, so a test cannot pass
+            # while the wrong method, door or command is being sent.
+            door_no = suffix.rsplit("/", 1)[-1]
+            if request.method != "PUT" or not door_no.isdigit() or int(door_no) < 1:
+                return httpx.Response(400, json={"statusCode": 4, "statusString": "Invalid Operation"})
+            if not re.fullmatch(r"<RemoteControlDoor><cmd>(open|close|alwaysOpen|alwaysClose|resume)</cmd></RemoteControlDoor>", request.content.decode()):
+                return httpx.Response(400, json={"statusCode": 4, "statusString": "Invalid Operation"})
             return httpx.Response(200, text="<ResponseStatus><statusCode>1</statusCode></ResponseStatus>")
         return httpx.Response(404, json={"statusCode": 4, "statusString": "Invalid Operation"})
 

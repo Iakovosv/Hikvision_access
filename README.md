@@ -116,7 +116,39 @@ The same actions are available as services if you prefer them in a script:
 | --- | --- |
 | `hikvision_access.create_visitor` | `name`, `begin_time`, `end_time`, and optionally `pin`, `employee_no`, `gender`, `user_type`, `card_no`, `door_no` |
 | `hikvision_access.delete_user` | `employee_no` |
-| `hikvision_access.open_door` | `door_no` |
+| `hikvision_access.open_door` | `door_no`, and optionally `dry_run` |
+
+### Checking the door command without opening the door
+
+There is no read-only way to ask a terminal whether a door command is allowed: the only
+request that answers is the one that unlocks the door. Two things let you check the command
+from a distance instead.
+
+Download the **diagnostics** from the integration page. The `door_commands` section shows
+the exact method, path and body that would be sent for each door, and downloading the
+report sends no door command:
+
+```yaml
+door_commands:
+  door_1:
+    method: PUT
+    path: AccessControl/RemoteControl/door/1
+    body: <RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>
+```
+
+Call the service with **`dry_run: true`** to build the command and log it without sending
+it. The log line names the request that would go out, and the terminal is not touched:
+
+```yaml
+action: hikvision_access.open_door
+data:
+  door_no: 1
+  dry_run: true
+```
+
+If the terminal reports more than one door, pressing a button for a door with no relay
+wired is the only end-to-end test that is completely safe: the whole path is exercised
+and no door opens.
 
 ## Requirements
 

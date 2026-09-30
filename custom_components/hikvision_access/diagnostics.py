@@ -14,7 +14,7 @@ from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME, CONF_VE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.httpx_client import get_async_client
 
-from .isapi import HikvisionAccessClient, HikvisionAccessError
+from .isapi import HikvisionAccessClient, HikvisionAccessError, door_command_body, door_command_path
 
 TO_REDACT = {CONF_HOST, CONF_PASSWORD, CONF_USERNAME}
 
@@ -52,10 +52,29 @@ async def async_get_config_entry_diagnostics(
         "door_numbers": coordinator.door_numbers,
         "persons_enrolled": coordinator.persons_enrolled,
         "last_exception": type(coordinator.last_exception).__name__ if coordinator.last_exception else None,
+        "door_commands": _door_command_preview(coordinator.door_numbers),
         "probe": await _probe_endpoints(hass, entry, client=client),
     }
 
     return diagnostics
+
+
+def _door_command_preview(door_numbers: list[int]) -> dict[str, dict[str, str]]:
+    """Show the door command that would be sent, without sending it.
+
+    There is no read-only way to ask the terminal whether a door command is permitted:
+    the only request that answers is the one that unlocks the door. Reporting the exact
+    method, path and body lets the command be checked from a distance instead.
+    """
+
+    return {
+        f"door_{door_no}": {
+            "method": "PUT",
+            "path": door_command_path(door_no),
+            "body": door_command_body(),
+        }
+        for door_no in door_numbers
+    }
 
 
 async def _probe_endpoints(

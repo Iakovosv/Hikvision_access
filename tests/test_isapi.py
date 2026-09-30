@@ -9,9 +9,12 @@ import pytest
 
 from custom_components.hikvision_access.isapi import (
     HikvisionAccessClient,
+    HikvisionAccessError,
     _device_error,
     _isapi_time,
     _masked_payload,
+    door_command_body,
+    door_command_path,
 )
 
 from .conftest import decoder, make_handler
@@ -464,3 +467,37 @@ async def test_lockout_is_reported_separately() -> None:
         await client.get_all_access_events(
             dt.datetime(2026, 1, 1, 0, 0, 0), dt.datetime(2026, 1, 1, 1, 0, 0)
         )
+
+
+def test_door_command_path_points_at_the_door() -> None:
+    """The path carries the door number, and nothing else."""
+
+    assert door_command_path(1) == "AccessControl/RemoteControl/door/1"
+    assert door_command_path(4) == "AccessControl/RemoteControl/door/4"
+
+
+def test_door_command_body_carries_the_command() -> None:
+    """The body is the RemoteControlDoor document the terminal expects."""
+
+    assert door_command_body() == "<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>"
+    assert door_command_body("resume") == "<RemoteControlDoor><cmd>resume</cmd></RemoteControlDoor>"
+
+
+async def test_open_door_dry_run_sends_no_request(client: HikvisionAccessClient) -> None:
+    """A dry run returns the request it would send and puts nothing on the wire."""
+
+    result = await client.open_door(2, dry_run=True)
+
+    assert result == {
+        "dry_run": True,
+        "method": "PUT",
+        "path": "AccessControl/RemoteControl/door/2",
+        "body": "<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>",
+    }
+
+
+async def test_open_door_rejects_an_unknown_command(client: HikvisionAccessClient) -> None:
+    """An unknown command is refused before anything is sent."""
+
+    with pytest.raises(HikvisionAccessError):
+        await client.open_door(1, command="unlock")
