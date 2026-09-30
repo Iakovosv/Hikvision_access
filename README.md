@@ -150,6 +150,10 @@ If the terminal reports more than one door, pressing a button for a door with no
 wired is the only end-to-end test that is completely safe: the whole path is exercised
 and no door opens.
 
+On Windows, `scripts/check-door-command.ps1` does the first two checks for you over the
+Home Assistant REST API. Set `HA_URL` and an admin `HA_TOKEN`, run it, and it prints the
+command that would be sent without sending it.
+
 ## Requirements
 
 - Home Assistant 2026.8 or newer
