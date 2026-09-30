@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Iakovosv. All rights reserved.
+# Personal use only. Commercial use requires written permission.
+# See LICENSE and COMMERCIAL.md. Redistribution prohibited.
 """Human-readable names for the verify modes the terminal reports.
 
 `hassfest` forbids a `logbook` translation category and the notification templates are built

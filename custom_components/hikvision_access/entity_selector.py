@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Iakovosv. All rights reserved.
+# Personal use only. Commercial use requires written permission.
+# See LICENSE and COMMERCIAL.md. Redistribution prohibited.
 """An entity selector that also accepts an empty selection.
 
 The notification and announcement fields start empty and stay empty until the user picks an

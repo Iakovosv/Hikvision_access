@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Iakovosv. All rights reserved.
+# Personal use only. Commercial use requires written permission.
+# See LICENSE and COMMERCIAL.md. Redistribution prohibited.
 """Person management for the Hikvision Access Control integration.
 
 Everything a person needs is edited from the Home Assistant UI instead of a YAML
